@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { initializeApp } from 'firebase/app';
-import { getAuth, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
+import { getAuth, createUserWithEmailAndPassword, signOut, signInWithEmailAndPassword, deleteUser } from 'firebase/auth';
 import firebaseConfig from '../../firebase-applet-config.json';
-import { UserPlus, Users, ShieldCheck, Mail, Key, Trash2, Loader2 } from 'lucide-react';
+import { UserPlus, Users, ShieldCheck, Mail, Key, Trash2, Loader2, Eye, EyeOff } from 'lucide-react';
 
 // Initialize a secondary app for creating users without signing out the admin
 const secondaryApp = initializeApp(firebaseConfig, 'SecondaryAuthApp');
@@ -17,6 +17,8 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchUsers();
@@ -55,6 +57,7 @@ export default function AdminDashboard() {
         email: email.toLowerCase().trim(),
         role: 'municipal',
         displayName: 'Municipal User',
+        initialPassword: password, // Store for admin reference
         createdAt: new Date().toISOString()
       });
 
@@ -74,6 +77,44 @@ export default function AdminDashboard() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDeleteUser = async (user: any) => {
+    if (!window.confirm(`Are you sure you want to delete ${user.email}? This will remove their Firestore record and attempt to delete their Auth account.`)) {
+      return;
+    }
+
+    setDeletingId(user.id);
+    setError('');
+    setSuccess('');
+
+    try {
+      // 1. Delete Firestore record
+      await deleteDoc(doc(db, 'users', user.id));
+
+      // 2. Attempt to delete from Firebase Auth (if it's a municipal user we created)
+      if (user.role === 'municipal' && user.initialPassword) {
+        try {
+          const userCredential = await signInWithEmailAndPassword(secondaryAuth, user.email, user.initialPassword);
+          await deleteUser(userCredential.user);
+          await signOut(secondaryAuth);
+        } catch (authErr) {
+          console.warn("Could not delete from Auth (password might have changed):", authErr);
+          // We don't throw here because the Firestore record is already gone, which revokes access
+        }
+      }
+
+      setSuccess(`User ${user.email} deleted successfully.`);
+      fetchUsers();
+    } catch (err: any) {
+      setError(`Failed to delete user: ${err.message}`);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const togglePassword = (email: string) => {
+    setShowPasswords(prev => ({ ...prev, [email]: !prev[email] }));
   };
 
   return (
@@ -145,17 +186,36 @@ export default function AdminDashboard() {
           <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
             {users.map((u, i) => (
               <div key={i} className="flex items-center justify-between p-3 bg-black/40 rounded-xl border border-zinc-800">
-                <div>
-                  <p className="text-sm font-bold text-white">{u.email}</p>
-                  <span className={`text-[10px] font-black uppercase px-1.5 py-0.5 rounded ${
-                    u.role === 'admin' ? 'bg-purple-500' : 
-                    u.role === 'municipal' ? 'bg-emerald-500' : 'bg-zinc-600'
-                  }`}>
-                    {u.role}
-                  </span>
+                <div className="flex-1 min-w-0 mr-4">
+                  <p className="text-sm font-bold text-white truncate">{u.email}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className={`text-[10px] font-black uppercase px-1.5 py-0.5 rounded ${
+                      u.role === 'admin' ? 'bg-purple-500' : 
+                      u.role === 'municipal' ? 'bg-emerald-500' : 'bg-zinc-600'
+                    }`}>
+                      {u.role}
+                    </span>
+                    {u.role === 'municipal' && u.initialPassword && (
+                      <div className="flex items-center gap-2 ml-2">
+                        <p className="text-[10px] text-zinc-500 font-mono">
+                          {showPasswords[u.email] ? u.initialPassword : '••••••••'}
+                        </p>
+                        <button 
+                          onClick={() => togglePassword(u.email)}
+                          className="text-zinc-600 hover:text-white transition-colors"
+                        >
+                          {showPasswords[u.email] ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <button className="p-2 text-zinc-700 hover:text-red-500 transition-colors">
-                  <Trash2 className="w-4 h-4" />
+                <button 
+                  onClick={() => handleDeleteUser(u)}
+                  disabled={deletingId === u.id || u.role === 'admin'}
+                  className="p-2 text-zinc-700 hover:text-red-500 transition-colors disabled:opacity-30"
+                >
+                  {deletingId === u.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                 </button>
               </div>
             ))}
