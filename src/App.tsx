@@ -47,14 +47,31 @@ export default function App() {
             role = 'admin';
           }
         } else {
-          role = isDefaultAdmin ? 'admin' : 'user';
-          await setDoc(userRef, {
-            uid: user.uid,
-            displayName: user.displayName,
-            email: user.email,
-            photoURL: user.photoURL,
-            role: role
-          });
+          // Check for pending municipal user by email
+          const emailKey = user.email?.toLowerCase().trim() || '';
+          const emailRef = doc(db, 'users', emailKey);
+          const emailSnap = await getDoc(emailRef);
+          
+          if (emailSnap.exists() && emailSnap.data().role === 'municipal') {
+            role = 'municipal';
+            // Migrate to UID-based record
+            await setDoc(userRef, {
+              ...emailSnap.data(),
+              uid: user.uid,
+              isPending: false,
+              displayName: user.displayName || emailSnap.data().displayName || 'Municipal User',
+              photoURL: user.photoURL || null
+            });
+          } else {
+            role = isDefaultAdmin ? 'admin' : 'user';
+            await setDoc(userRef, {
+              uid: user.uid,
+              displayName: user.displayName,
+              email: user.email,
+              photoURL: user.photoURL,
+              role: role
+            });
+          }
         }
         setUser(user);
         setUserRole(role);
@@ -71,8 +88,13 @@ export default function App() {
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Login failed:", error);
+      if (error.code === 'auth/unauthorized-domain') {
+        alert("Domain not authorized! Please add your Vercel URL to the 'Authorized domains' list in the Firebase Console (Authentication > Settings).");
+      } else {
+        alert("Login failed: " + error.message);
+      }
     }
   };
 

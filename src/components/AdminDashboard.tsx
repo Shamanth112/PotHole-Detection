@@ -1,8 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { db, auth } from '../firebase';
-import { collection, getDocs, doc, setDoc, query, where } from 'firebase/firestore';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { UserPlus, Users, ShieldCheck, Mail, Key, Trash2 } from 'lucide-react';
+import { db } from '../firebase';
+import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
+import { initializeApp } from 'firebase/app';
+import { getAuth, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
+import firebaseConfig from '../../firebase-applet-config.json';
+import { UserPlus, Users, ShieldCheck, Mail, Key, Trash2, Loader2 } from 'lucide-react';
+
+// Initialize a secondary app for creating users without signing out the admin
+const secondaryApp = initializeApp(firebaseConfig, 'SecondaryAuthApp');
+const secondaryAuth = getAuth(secondaryApp);
 
 export default function AdminDashboard() {
   const [users, setUsers] = useState<any[]>([]);
@@ -10,7 +16,6 @@ export default function AdminDashboard() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
   const [success, setSuccess] = useState('');
 
   useEffect(() => {
@@ -18,9 +23,15 @@ export default function AdminDashboard() {
   }, []);
 
   const fetchUsers = async () => {
-    const querySnapshot = await getDocs(collection(db, 'users'));
-    const usersList = querySnapshot.docs.map(doc => doc.data());
-    setUsers(usersList);
+    try {
+      const querySnapshot = await getDocs(collection(db, 'users'));
+      const usersList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      // Sort in memory to avoid index requirement
+      usersList.sort((a: any, b: any) => (a.email || '').localeCompare(b.email || ''));
+      setUsers(usersList);
+    } catch (err) {
+      console.error("Error fetching users:", err);
+    }
   };
 
   const handleCreateMunicipal = async (e: React.FormEvent) => {
@@ -30,20 +41,36 @@ export default function AdminDashboard() {
     setSuccess('');
 
     try {
-      const tempId = Math.random().toString(36).substring(7);
-      await setDoc(doc(db, 'users', tempId), {
-        uid: tempId,
-        email,
+      // 1. Create the user in Firebase Auth using the secondary app
+      // This creates the user without affecting the current admin's session
+      const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+      const newUser = userCredential.user;
+      
+      // Immediately sign out from the secondary app to keep it clean
+      await signOut(secondaryAuth);
+
+      // 2. Create the Firestore record using the real UID
+      await setDoc(doc(db, 'users', newUser.uid), {
+        uid: newUser.uid,
+        email: email.toLowerCase().trim(),
         role: 'municipal',
-        displayName: 'Municipal User'
+        displayName: 'Municipal User',
+        createdAt: new Date().toISOString()
       });
 
       setEmail('');
       setPassword('');
       fetchUsers();
-      setSuccess("Municipal user record created in Firestore. Note: You must also create the login in Firebase Auth Console with this email.");
+      setSuccess(`Successfully created municipal account for ${email}. They can now log in immediately.`);
     } catch (err: any) {
-      setError(err.message);
+      console.error("Error adding municipal user:", err);
+      if (err.code === 'auth/email-already-in-use') {
+        setError("This email is already registered in Firebase Authentication.");
+      } else if (err.code === 'auth/weak-password') {
+        setError("Password is too weak. Please use at least 6 characters.");
+      } else {
+        setError(err.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -97,9 +124,14 @@ export default function AdminDashboard() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-xl transition-colors disabled:opacity-50"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {loading ? 'Creating...' : 'Register Municipal User'}
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Creating Account...
+                </>
+              ) : 'Register Municipal User'}
             </button>
           </form>
         </div>

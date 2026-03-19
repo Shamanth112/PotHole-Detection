@@ -24,9 +24,14 @@ export default function MunicipalLogin({ onBack }: MunicipalLoginProps) {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
       
-      // Verify role
+      // Verify role (check UID first, then email for first-time login)
       const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists() || userDoc.data().role !== 'municipal') {
+      const emailDoc = await getDoc(doc(db, 'users', user.email?.toLowerCase().trim() || ''));
+      
+      const isMunicipal = (userDoc.exists() && userDoc.data().role === 'municipal') || 
+                          (emailDoc.exists() && emailDoc.data().role === 'municipal');
+
+      if (!isMunicipal) {
         await auth.signOut();
         throw new Error("Access denied. This account is not authorized for municipal login.");
       }
