@@ -50,6 +50,8 @@ export default function MunicipalLogin({ onBack }: MunicipalLoginProps) {
       console.error("Login Error:", err);
       if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
         setError("Invalid email or password. Please check your credentials.");
+      } else if (err.code === 'auth/operation-not-allowed') {
+        setError("Email/Password authentication is not enabled in your Firebase project. Please enable it in the Firebase Console (Authentication > Sign-in method).");
       } else {
         setError(err.message);
       }

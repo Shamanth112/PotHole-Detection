@@ -85,6 +85,7 @@ service cloud.firestore {
                       request.resource.data.role == 'municipal'
                     ));
       allow update: if isAdmin() || (isOwner(userId) && request.resource.data.role == resource.data.role);
+      allow delete: if isAdmin();
     }
 
     match /potholes/{potholeId} {

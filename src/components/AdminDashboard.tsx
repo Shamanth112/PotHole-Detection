@@ -71,6 +71,8 @@ export default function AdminDashboard() {
         setError("This email is already registered in Firebase Authentication.");
       } else if (err.code === 'auth/weak-password') {
         setError("Password is too weak. Please use at least 6 characters.");
+      } else if (err.code === 'auth/operation-not-allowed') {
+        setError("Email/Password authentication is not enabled in your Firebase project. Please enable it in the Firebase Console (Authentication > Sign-in method).");
       } else {
         setError(err.message);
       }
