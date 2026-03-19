@@ -1,0 +1,8 @@
+{
+  "name": "PotholePatrol AI",
+  "description": "Real-time pothole detection and mapping application using AI and GPS.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ]
+}

@@ -1,0 +1,83 @@
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: potholes
+// Document ID: auto-generated
+// Fields:
+//   - latitude: number (required) - GPS latitude
+//   - longitude: number (required) - GPS longitude
+//   - timestamp: timestamp (required) - When the pothole was detected
+//   - severity: string (optional) - low, medium, high
+//   - imageUrl: string (optional) - URL to the captured image
+//   - userId: string (required) - UID of the user who detected it
+//   - address: string (optional) - Reverse geocoded address
+//
+// Collection: users
+// Document ID: userId (UID)
+// Fields:
+//   - uid: string (required)
+//   - displayName: string (optional)
+//   - email: string (required)
+//   - photoURL: string (optional)
+//   - role: string (required) - user, admin
+//
+// ===============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "shamanth.p2007@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidPothole(data) {
+      return data.keys().hasAll(['latitude', 'longitude', 'timestamp', 'userId']) &&
+             data.latitude is number &&
+             data.longitude is number &&
+             data.timestamp is timestamp &&
+             data.userId == request.auth.uid &&
+             (!('severity' in data) || data.severity in ['low', 'medium', 'high']) &&
+             (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() < 2048)) &&
+             (!('address' in data) || (data.address is string && data.address.size() < 500));
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'role']) &&
+             data.uid == request.auth.uid &&
+             data.email is string &&
+             data.role in ['user', 'admin'] &&
+             (data.role == 'user' || isAdmin());
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isOwner(userId) && isValidUser(request.resource.data);
+    }
+
+    match /potholes/{potholeId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidPothole(request.resource.data);
+      allow update, delete: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+    }
+  }
+}

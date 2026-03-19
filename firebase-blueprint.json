@@ -1,0 +1,43 @@
+{
+  "entities": {
+    "pothole": {
+      "title": "Pothole",
+      "description": "A detected pothole with location and metadata.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "severity": { "type": "string", "enum": ["low", "medium", "high"] },
+        "imageUrl": { "type": "string" },
+        "userId": { "type": "string" },
+        "address": { "type": "string" }
+      },
+      "required": ["latitude", "longitude", "timestamp", "userId"]
+    },
+    "user": {
+      "title": "User",
+      "description": "User profile information.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "admin"] }
+      },
+      "required": ["uid", "email"]
+    }
+  },
+  "firestore": {
+    "/potholes/{potholeId}": {
+      "schema": "pothole",
+      "description": "Collection of all detected potholes."
+    },
+    "/users/{userId}": {
+      "schema": "user",
+      "description": "User profiles."
+    }
+  }
+}
