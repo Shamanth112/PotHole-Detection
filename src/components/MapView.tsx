@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { APIProvider, Map, AdvancedMarker, Pin, InfoWindow, useAdvancedMarkerRef } from '@vis.gl/react-google-maps';
 import { Pothole } from '../hooks/usePotholes';
-import { MapPin, Calendar, User, Navigation } from 'lucide-react';
+import { MapPin, Calendar, User, Navigation, LocateFixed } from 'lucide-react';
 
 const API_KEY = process.env.GOOGLE_MAPS_PLATFORM_KEY || '';
 const hasValidKey = Boolean(API_KEY) && API_KEY !== 'YOUR_API_KEY';
@@ -12,6 +12,26 @@ interface MapViewProps {
 
 export default function MapView({ potholes }: MapViewProps) {
   const [selectedPothole, setSelectedPothole] = useState<Pothole | null>(null);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>({ lat: 37.42, lng: -122.08 });
+
+  useEffect(() => {
+    if (navigator.geolocation) {
+      const watchId = navigator.geolocation.watchPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          setUserLocation({ lat: latitude, lng: longitude });
+          // Optionally center map on user first time
+          if (!userLocation) {
+            setMapCenter({ lat: latitude, lng: longitude });
+          }
+        },
+        (error) => console.error("Error watching position:", error),
+        { enableHighAccuracy: true }
+      );
+      return () => navigator.geolocation.clearWatch(watchId);
+    }
+  }, []);
 
   if (!hasValidKey) {
     return (
@@ -26,17 +46,27 @@ export default function MapView({ potholes }: MapViewProps) {
   }
 
   return (
-    <div className="w-full h-full rounded-2xl overflow-hidden shadow-inner border border-zinc-800">
+    <div className="w-full h-full rounded-2xl overflow-hidden shadow-inner border border-zinc-800 relative">
       <APIProvider apiKey={API_KEY} version="weekly">
         <Map
-          defaultCenter={{ lat: 37.42, lng: -122.08 }}
-          defaultZoom={12}
+          defaultCenter={mapCenter}
+          defaultZoom={15}
           mapId="POTHOLE_MAP_ID"
           internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
           style={{ width: '100%', height: '100%' }}
           gestureHandling={'greedy'}
           disableDefaultUI={true}
         >
+          {/* User Location Marker */}
+          {userLocation && (
+            <AdvancedMarker position={userLocation}>
+              <div className="relative flex items-center justify-center">
+                <div className="absolute w-8 h-8 bg-blue-500/30 rounded-full animate-ping" />
+                <div className="w-4 h-4 bg-blue-500 rounded-full border-2 border-white shadow-lg" />
+              </div>
+            </AdvancedMarker>
+          )}
+
           {potholes.map((p) => (
             <PotholeMarker 
               key={p.id} 
@@ -69,12 +99,28 @@ export default function MapView({ potholes }: MapViewProps) {
                     <Navigation className="w-3 h-3" />
                     <span>{selectedPothole.latitude.toFixed(4)}, {selectedPothole.longitude.toFixed(4)}</span>
                   </div>
+                  {selectedPothole.userName && (
+                    <div className="flex items-center gap-1.5">
+                      <User className="w-3 h-3" />
+                      <span>Reported by: {selectedPothole.userName}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </InfoWindow>
           )}
         </Map>
       </APIProvider>
+      
+      {/* Recenter Button */}
+      {userLocation && (
+        <button 
+          onClick={() => setMapCenter(userLocation)}
+          className="absolute bottom-4 right-4 p-3 bg-white text-black rounded-full shadow-xl hover:bg-zinc-100 transition-all z-10"
+        >
+          <LocateFixed className="w-5 h-5" />
+        </button>
+      )}
     </div>
   );
 }

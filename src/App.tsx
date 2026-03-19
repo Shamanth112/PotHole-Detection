@@ -7,6 +7,7 @@ import CameraView from './components/CameraView';
 import MapView from './components/MapView';
 import PotholeList from './components/PotholeList';
 import MunicipalLogin from './components/MunicipalLogin';
+import MunicipalDashboard from './components/MunicipalDashboard';
 import AdminDashboard from './components/AdminDashboard';
 import { usePotholes } from './hooks/usePotholes';
 import { 
@@ -18,7 +19,8 @@ import {
   Activity,
   Settings,
   Building2,
-  ShieldCheck
+  ShieldCheck,
+  ArrowLeft
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import confetti from 'canvas-confetti';
@@ -125,6 +127,31 @@ export default function App() {
     return (
       <div className="flex items-center justify-center h-screen bg-black">
         <div className="w-16 h-16 border-4 border-red-500/20 border-t-red-500 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Simplified view for Municipal users
+  if (user && userRole === 'municipal') {
+    return (
+      <div className="min-h-screen bg-black">
+        <header className="h-16 border-b border-zinc-800 bg-black/50 backdrop-blur-xl flex items-center justify-between px-6 sticky top-0 z-50">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-blue-600">
+              <ShieldAlert className="w-5 h-5 text-white" />
+            </div>
+            <span className="font-black text-xl tracking-tighter uppercase italic">
+              Patrol<span className="text-blue-600">AI</span>
+            </span>
+          </div>
+          <div className="flex items-center gap-4">
+            <button onClick={handleLogout} className="p-2 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-white">
+              <LogOut className="w-5 h-5" />
+            </button>
+            <img src={user.photoURL || `https://ui-avatars.com/api/?name=${user.email}`} className="w-8 h-8 rounded-full border border-zinc-700" alt="User" />
+          </div>
+        </header>
+        <MunicipalDashboard potholes={potholes} />
       </div>
     );
   }
@@ -275,14 +302,6 @@ function TabButton({ active, onClick, icon, label }: { active: boolean; onClick:
       {icon}
       <span className="text-[10px] font-bold uppercase tracking-tighter">{label}</span>
     </button>
-  );
-}
-
-function ArrowLeft({ className }: { className?: string }) {
-  return (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>
-    </svg>
   );
 }
 

@@ -10,6 +10,7 @@ export interface Pothole {
   severity: 'low' | 'medium' | 'high';
   imageUrl?: string;
   userId: string;
+  userName?: string;
   address?: string;
 }
 

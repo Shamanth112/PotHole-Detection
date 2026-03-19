@@ -57,7 +57,7 @@ export default function PotholeList({ potholes }: PotholeListProps) {
                   </div>
                   <div className="flex items-center gap-1">
                     <User className="w-3 h-3" />
-                    <span>{p.userId.slice(0, 6)}...</span>
+                    <span>{p.userName || 'Anonymous'}</span>
                   </div>
                 </div>
               </div>

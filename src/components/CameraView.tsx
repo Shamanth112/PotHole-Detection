@@ -101,6 +101,7 @@ export default function CameraView({ onDetection }: CameraViewProps) {
           timestamp: serverTimestamp(),
           severity: detection.score > 0.8 ? 'high' : 'medium',
           userId: auth.currentUser?.uid,
+          userName: auth.currentUser?.displayName || auth.currentUser?.email || 'Anonymous',
           class: detection.class
         });
         onDetection(detection);
