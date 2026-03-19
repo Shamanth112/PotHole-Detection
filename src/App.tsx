@@ -39,15 +39,21 @@ export default function App() {
         const userSnap = await getDoc(userRef);
         let role: 'user' | 'admin' | 'municipal' = 'user';
         
+        const isDefaultAdmin = user.email === "shamanth.p2007@gmail.com";
+        
         if (userSnap.exists()) {
           role = userSnap.data().role;
+          if (isDefaultAdmin && role !== 'admin') {
+            role = 'admin';
+          }
         } else {
+          role = isDefaultAdmin ? 'admin' : 'user';
           await setDoc(userRef, {
             uid: user.uid,
             displayName: user.displayName,
             email: user.email,
             photoURL: user.photoURL,
-            role: 'user'
+            role: role
           });
         }
         setUser(user);

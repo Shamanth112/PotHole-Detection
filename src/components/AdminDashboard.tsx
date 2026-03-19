@@ -11,6 +11,8 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const [success, setSuccess] = useState('');
+
   useEffect(() => {
     fetchUsers();
   }, []);
@@ -25,23 +27,9 @@ export default function AdminDashboard() {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setSuccess('');
 
     try {
-      // Note: Creating a user with email/password will log out the current admin
-      // unless we use a separate Firebase app instance or a Cloud Function.
-      // For this demo, we'll simulate the creation by adding to Firestore,
-      // but in a real app, you'd use Firebase Admin SDK or a Cloud Function.
-      
-      // Since we can't easily create auth users from the client without logging out,
-      // we'll instruct the admin to use the Firebase Console for Auth, 
-      // and this dashboard will link the UID to the 'municipal' role.
-      
-      // Alternatively, we can just add the user to Firestore with a placeholder UID
-      // and let them "claim" it, but the standard way is Cloud Functions.
-      
-      // For this specific environment, I'll implement a "Invite" system or 
-      // just a direct Firestore entry that the Municipal user will use.
-      
       const tempId = Math.random().toString(36).substring(7);
       await setDoc(doc(db, 'users', tempId), {
         uid: tempId,
@@ -53,7 +41,7 @@ export default function AdminDashboard() {
       setEmail('');
       setPassword('');
       fetchUsers();
-      alert("Municipal user record created in Firestore. Note: You must also create the login in Firebase Auth Console with this email.");
+      setSuccess("Municipal user record created in Firestore. Note: You must also create the login in Firebase Auth Console with this email.");
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -105,6 +93,7 @@ export default function AdminDashboard() {
               </div>
             </div>
             {error && <p className="text-red-500 text-xs">{error}</p>}
+            {success && <p className="text-emerald-500 text-xs bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20">{success}</p>}
             <button
               type="submit"
               disabled={loading}
