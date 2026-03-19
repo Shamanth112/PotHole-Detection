@@ -46,6 +46,10 @@ service cloud.firestore {
           (request.auth.token.email == "shamanth.p2007@gmail.com" && request.auth.token.email_verified == true));
     }
 
+    function isMunicipal() {
+      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'municipal';
+    }
+
     function isValidPothole(data) {
       return data.keys().hasAll(['latitude', 'longitude', 'timestamp', 'userId']) &&
              data.latitude is number &&
@@ -54,15 +58,15 @@ service cloud.firestore {
              data.userId == request.auth.uid &&
              (!('severity' in data) || data.severity in ['low', 'medium', 'high']) &&
              (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() < 2048)) &&
-             (!('address' in data) || (data.address is string && data.address.size() < 500));
+             (!('address' in data) || (data.address is string && data.address.size() < 500)) &&
+             (!('status' in data) || data.status in ['reported', 'fixed', 'verified']);
     }
 
     function isValidUser(data) {
       return data.keys().hasAll(['uid', 'email', 'role']) &&
-             data.uid == request.auth.uid &&
+             data.uid is string &&
              data.email is string &&
-             data.role in ['user', 'admin'] &&
-             (data.role == 'user' || isAdmin());
+             data.role in ['user', 'admin', 'municipal'];
     }
 
     // ===============================================================
@@ -71,13 +75,16 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if isAuthenticated();
-      allow create, update: if isOwner(userId) && isValidUser(request.resource.data);
+      // Only admins can create/update roles, users can only update their own non-role info
+      allow create: if isAdmin() || (isOwner(userId) && request.resource.data.role == 'user');
+      allow update: if isAdmin() || (isOwner(userId) && request.resource.data.role == resource.data.role);
     }
 
     match /potholes/{potholeId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() && isValidPothole(request.resource.data);
-      allow update, delete: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow update: if isAdmin() || isMunicipal() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow delete: if isAdmin();
     }
   }
 }
