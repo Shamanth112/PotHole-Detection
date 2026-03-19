@@ -34,52 +34,61 @@ export default function App() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        const userRef = doc(db, 'users', user.uid);
-        const userSnap = await getDoc(userRef);
-        let role: 'user' | 'admin' | 'municipal' = 'user';
-        
-        const isDefaultAdmin = user.email === "shamanth.p2007@gmail.com";
-        
-        if (userSnap.exists()) {
-          role = userSnap.data().role;
-          if (isDefaultAdmin && role !== 'admin') {
-            role = 'admin';
-          }
-        } else {
-          // Check for pending municipal user by email
-          const emailKey = user.email?.toLowerCase().trim() || '';
-          const emailRef = doc(db, 'users', emailKey);
-          const emailSnap = await getDoc(emailRef);
+      try {
+        if (user) {
+          const userRef = doc(db, 'users', user.uid);
+          const userSnap = await getDoc(userRef);
+          let role: 'user' | 'admin' | 'municipal' = 'user';
           
-          if (emailSnap.exists() && emailSnap.data().role === 'municipal') {
-            role = 'municipal';
-            // Migrate to UID-based record
-            await setDoc(userRef, {
-              ...emailSnap.data(),
-              uid: user.uid,
-              isPending: false,
-              displayName: user.displayName || emailSnap.data().displayName || 'Municipal User',
-              photoURL: user.photoURL || null
-            });
+          const isDefaultAdmin = user.email === "shamanth.p2007@gmail.com";
+          
+          if (userSnap.exists()) {
+            role = userSnap.data().role;
+            if (isDefaultAdmin && role !== 'admin') {
+              role = 'admin';
+            }
           } else {
-            role = isDefaultAdmin ? 'admin' : 'user';
-            await setDoc(userRef, {
-              uid: user.uid,
-              displayName: user.displayName,
-              email: user.email,
-              photoURL: user.photoURL,
-              role: role
-            });
+            // Check for pending municipal user by email
+            const emailKey = user.email?.toLowerCase().trim() || '';
+            const emailRef = doc(db, 'users', emailKey);
+            const emailSnap = await getDoc(emailRef);
+            
+            if (emailSnap.exists() && emailSnap.data().role === 'municipal') {
+              role = 'municipal';
+              // Migrate to UID-based record
+              await setDoc(userRef, {
+                ...emailSnap.data(),
+                uid: user.uid,
+                isPending: false,
+                displayName: user.displayName || emailSnap.data().displayName || 'Municipal User',
+                photoURL: user.photoURL || null
+              });
+            } else {
+              role = isDefaultAdmin ? 'admin' : 'user';
+              await setDoc(userRef, {
+                uid: user.uid,
+                displayName: user.displayName,
+                email: user.email,
+                photoURL: user.photoURL,
+                role: role
+              });
+            }
           }
+          setUser(user);
+          setUserRole(role);
+        } else {
+          setUser(null);
+          setUserRole(null);
         }
-        setUser(user);
-        setUserRole(role);
-      } else {
-        setUser(null);
-        setUserRole(null);
+      } catch (error: any) {
+        console.error("Auth state change error:", error);
+        // If it's a permission error, it might be because the user was just deleted or rules changed
+        if (error.code === 'permission-denied') {
+          auth.signOut();
+        }
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
     return () => unsubscribe();
   }, []);

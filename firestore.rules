@@ -75,8 +75,15 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if isAuthenticated();
-      // Only admins can create/update roles, users can only update their own non-role info
-      allow create: if isAdmin() || (isOwner(userId) && request.resource.data.role == 'user');
+      // Allow creation if:
+      // 1. Admin is creating it
+      // 2. User is creating their own 'user' profile
+      // 3. User is migrating a 'municipal' profile
+      allow create: if isAdmin() || 
+                    (isOwner(userId) && (
+                      request.resource.data.role == 'user' || 
+                      request.resource.data.role == 'municipal'
+                    ));
       allow update: if isAdmin() || (isOwner(userId) && request.resource.data.role == resource.data.role);
     }
 
