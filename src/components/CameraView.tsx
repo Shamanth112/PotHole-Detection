@@ -19,6 +19,8 @@ export default function CameraView({ onDetection, onBack, gpsActive }: CameraVie
   const [detections, setDetections] = useState<Detection[]>([]);
   const [isDetecting, setIsDetecting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [showShutter, setShowShutter] = useState(false);
+  const [showReportedToast, setShowReportedToast] = useState(false);
   const lastDetectionTime = useRef<number>(0);
 
   useEffect(() => {
@@ -65,7 +67,7 @@ export default function CameraView({ onDetection, onBack, gpsActive }: CameraVie
         
         if (potholes.length > 0) {
           const now = Date.now();
-          if (now - lastDetectionTime.current > 3000) { // Throttle uploads to 3 seconds
+          if (now - lastDetectionTime.current > 2000) { // Faster throttle: 2 seconds
             handlePotholeDetected(potholes[0]);
             lastDetectionTime.current = now;
           }
@@ -122,6 +124,9 @@ export default function CameraView({ onDetection, onBack, gpsActive }: CameraVie
     if (!auth.currentUser || !videoRef.current || !canvasRef.current || isUploading) return;
     
     setIsUploading(true);
+    setShowShutter(true);
+    setTimeout(() => setShowShutter(false), 150); // Shutter flash effect
+
     try {
       // Capture current frame
       const canvas = document.createElement('canvas');
@@ -137,6 +142,10 @@ export default function CameraView({ onDetection, onBack, gpsActive }: CameraVie
           const reportId = `ai_report_${Date.now()}`;
           const imageUrl = await uploadPotholeImageFromBlob(blob, `reports/${auth.currentUser.uid}/${reportId}.jpg`);
           onDetection(detection, imageUrl);
+          
+          // Show success toast
+          setShowReportedToast(true);
+          setTimeout(() => setShowReportedToast(false), 2000);
         }
       }
     } catch (error) {
@@ -166,6 +175,34 @@ export default function CameraView({ onDetection, onBack, gpsActive }: CameraVie
         className="absolute inset-0 w-full h-full object-cover pointer-events-none"
       />
       
+      {/* Shutter Flash Effect */}
+      <AnimatePresence>
+        {showShutter && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-white z-[60] pointer-events-none"
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Reported Toast */}
+      <AnimatePresence>
+        {showReportedToast && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.5, y: -50 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.5, y: -50 }}
+            className="absolute top-24 left-1/2 -translate-x-1/2 z-[70] pointer-events-none"
+          >
+            <div className="bg-emerald-500 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 border-2 border-white/20">
+              <ShieldCheck className="w-6 h-6" />
+              <span className="font-black uppercase tracking-widest text-sm italic">Reported to Municipal!</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       {/* Road Detection Zone Overlay */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="h-[45%] bg-black/40 backdrop-blur-[2px] border-b border-white/10 flex items-end justify-center pb-2">
