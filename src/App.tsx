@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { auth, db } from './firebase';
+import { auth } from './firebase';
 import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, User, updateProfile } from 'firebase/auth';
-import { doc, setDoc, getDoc, collection, addDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
-import { handleFirestoreError, OperationType } from './utils/errorHandlers';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import HomeView from './components/HomeView';
 import ReportView from './components/ReportView';
@@ -12,6 +10,7 @@ import PotholeList from './components/PotholeList';
 import MunicipalDashboard from './components/MunicipalDashboard';
 import AdminDashboard from './components/AdminDashboard';
 import { usePotholes } from './hooks/usePotholes';
+import { dbService } from './services/databaseService';
 import { 
   LayoutDashboard, 
   Map as MapIcon, 
@@ -75,30 +74,26 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       try {
         if (user) {
-          const userRef = doc(db, 'users', user.uid);
-          const userSnap = await getDoc(userRef);
           let role: 'user' | 'admin' | 'municipal' = 'user';
-          
           const isDefaultAdmin = user.email === "shamanth.p2007@gmail.com";
           
-          // Check permitted_users collection for assigned role
-          const permittedRef = doc(db, 'permitted_users', user.email?.toLowerCase().trim() || '');
-          const permittedSnap = await getDoc(permittedRef);
+          // Check permitted_users table for assigned role
+          const permitted = await dbService.getPermittedUser(user.email || '');
           
-          if (permittedSnap.exists()) {
-            role = permittedSnap.data().role;
+          if (permitted) {
+            role = permitted.role;
           } else if (isDefaultAdmin) {
             role = 'admin';
           }
 
-          // Sync with users collection
-          await setDoc(userRef, {
+          // Sync with users table
+          await dbService.upsertUserProfile({
             uid: user.uid,
-            displayName: user.displayName,
-            email: user.email,
-            photoURL: user.photoURL,
+            displayName: user.displayName || undefined,
+            email: user.email || '',
+            photoURL: user.photoURL || undefined,
             role: role
-          }, { merge: true });
+          });
 
           setUser(user);
           setUserRole(role);
@@ -153,8 +148,14 @@ export default function App() {
       const photoURL = await uploadPotholeImage(file, `profiles/${user.uid}_${Date.now()}.jpg`);
       await updateProfile(user, { photoURL });
       
-      // Update Firestore user doc as well
-      await updateDoc(doc(db, 'users', user.uid), { photoURL });
+      // Update Supabase user profile
+      await dbService.upsertUserProfile({
+        uid: user.uid,
+        displayName: user.displayName || undefined,
+        email: user.email || '',
+        photoURL: photoURL,
+        role: userRole || 'user'
+      });
       
       // Force refresh user state
       const updatedUser = auth.currentUser;
@@ -170,12 +171,13 @@ export default function App() {
   const handleReportPothole = async (data: { latitude: number; longitude: number; severity: string; address?: string; reportImageUrl?: string; notes?: string }, isAuto = false) => {
     if (!user) return;
     try {
-      await addDoc(collection(db, 'potholes'), {
+      await dbService.addPothole({
         ...data,
+        severity: data.severity as any,
         userId: user.uid,
         userName: user.displayName || 'Road Guardian',
         status: 'reported',
-        timestamp: serverTimestamp(),
+        timestamp: new Date().toISOString(),
       });
       
       if (!isAuto) {
@@ -188,7 +190,8 @@ export default function App() {
         });
       }
     } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, 'potholes');
+      console.error("Error reporting pothole:", error);
+      alert("Failed to report pothole.");
     }
   };
 
@@ -392,7 +395,7 @@ export default function App() {
                       stats={{
                         detectedToday: potholes.filter(p => {
                           const today = new Date();
-                          const pDate = new Date(p.timestamp?.seconds * 1000);
+                          const pDate = new Date(p.timestamp);
                           return pDate.toDateString() === today.toDateString();
                         }).length,
                         fixedThisWeek: potholes.filter(p => p.status === 'resolved').length

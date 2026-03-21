@@ -1,8 +1,7 @@
 import React, { useState, useRef } from 'react';
-import { Pothole } from '../hooks/usePotholes';
 import { MapPin, User, Navigation, Clock, ShieldAlert, CheckCircle2, Loader2, AlertCircle, Camera, Image as ImageIcon, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { supabase } from '../supabase';
+import { dbService, Pothole } from '../services/databaseService';
 import { uploadPotholeImage } from '../services/storageService';
 
 interface MunicipalDashboardProps {
@@ -44,18 +43,13 @@ export default function MunicipalDashboard({ potholes }: MunicipalDashboardProps
         resolvedImageUrl = await uploadPotholeImage(selectedFile, `resolved/${id}_${Date.now()}.jpg`);
       }
 
-      const updateData: any = { status: newStatus };
+      const updateData: Partial<Pothole> = { status: newStatus };
       if (resolvedImageUrl) {
         updateData.resolvedImageUrl = resolvedImageUrl;
       }
       
-      const { error } = await supabase
-        .from('potholes')
-        .update(updateData)
-        .eq('id', id);
-
-      if (error) throw error;
-
+      await dbService.updatePothole(id, updateData);
+      
       setResolvingId(null);
       clearSelection();
     } catch (error) {

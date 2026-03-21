@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../supabase';
+import { auth } from '../firebase';
+import { dbService, Pothole, UserProfile, PermittedUser } from '../services/databaseService';
 import { 
   UserPlus, Users, ShieldCheck, Mail, Trash2, Loader2, 
   LayoutDashboard, MapPin, Plus, AlertTriangle, CheckCircle2, Clock, 
-  TrendingUp, BarChart3, Shield, X
+  TrendingUp, BarChart3, Shield
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -11,9 +12,9 @@ type AdminTab = 'stats' | 'users' | 'potholes' | 'permitted';
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<AdminTab>('stats');
-  const [users, setUsers] = useState<any[]>([]);
-  const [potholes, setPotholes] = useState<any[]>([]);
-  const [permittedUsers, setPermittedUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [potholes, setPotholes] = useState<Pothole[]>([]);
+  const [permittedUsers, setPermittedUsers] = useState<PermittedUser[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -34,78 +35,39 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetchUsers();
-    fetchPotholes();
-    fetchPermittedUsers();
+    
+    // Initial fetch
+    const fetchData = async () => {
+      try {
+        const [potholesData, permittedData] = await Promise.all([
+          dbService.getPotholes(),
+          dbService.getAllPermittedUsers()
+        ]);
+        setPotholes(potholesData);
+        setPermittedUsers(permittedData);
+      } catch (err) {
+        console.error("Error fetching admin data:", err);
+      }
+    };
+    fetchData();
 
-    // Set up real-time subscriptions
-    const potholesSubscription = supabase
-      .channel('potholes-admin')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'potholes' }, () => {
-        fetchPotholes();
-      })
-      .subscribe();
-
-    const permittedSubscription = supabase
-      .channel('permitted-admin')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'permitted_users' }, () => {
-        fetchPermittedUsers();
-      })
-      .subscribe();
-
-    const usersSubscription = supabase
-      .channel('users-admin')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => {
-        fetchUsers();
-      })
-      .subscribe();
+    // Listen to changes
+    const potholeSub = dbService.subscribeToPotholes(setPotholes);
+    const permittedSub = dbService.subscribeToPermittedUsers(setPermittedUsers);
 
     return () => {
-      supabase.removeChannel(potholesSubscription);
-      supabase.removeChannel(permittedSubscription);
-      supabase.removeChannel(usersSubscription);
+      potholeSub.unsubscribe();
+      permittedSub.unsubscribe();
     };
   }, []);
 
   const fetchUsers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .order('email');
-      
-      if (error) throw error;
-      setUsers(data || []);
+      const usersList = await dbService.getAllUsers();
+      usersList.sort((a, b) => (a.email || '').localeCompare(b.email || ''));
+      setUsers(usersList);
     } catch (err) {
       console.error("Error fetching users:", err);
-    }
-  };
-
-  const fetchPotholes = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('potholes')
-        .select('*')
-        .order('timestamp', { ascending: false })
-        .limit(100);
-      
-      if (error) throw error;
-      setPotholes(data || []);
-    } catch (err) {
-      console.error("Error fetching potholes:", err);
-    }
-  };
-
-  const fetchPermittedUsers = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('permitted_users')
-        .select('*')
-        .order('email');
-      
-      if (error) throw error;
-      setPermittedUsers(data || []);
-    } catch (err) {
-      console.error("Error fetching permitted users:", err);
     }
   };
 
@@ -117,21 +79,16 @@ export default function AdminDashboard() {
 
     try {
       const emailKey = newEmail.toLowerCase().trim();
-      const { error } = await supabase
-        .from('permitted_users')
-        .upsert({
-          email: emailKey,
-          role: newRole,
-          added_at: new Date().toISOString()
-        });
-
-      if (error) throw error;
+      await dbService.addPermittedUser({
+        email: emailKey,
+        role: newRole
+      });
 
       setNewEmail('');
       setSuccess(`Successfully added ${emailKey} as ${newRole}.`);
     } catch (err: any) {
       console.error("Error adding permitted user:", err);
-      setError(err.message);
+      setError("Failed to add permitted user.");
     } finally {
       setLoading(false);
     }
@@ -140,29 +97,20 @@ export default function AdminDashboard() {
   const handleDeletePermittedUser = async (email: string) => {
     if (!window.confirm(`Remove permissions for ${email}?`)) return;
     try {
-      const { error } = await supabase
-        .from('permitted_users')
-        .delete()
-        .eq('email', email);
-
-      if (error) throw error;
+      await dbService.deletePermittedUser(email);
       setSuccess(`Permissions removed for ${email}.`);
     } catch (err: any) {
       console.error("Error deleting permitted user:", err);
     }
   };
 
-  const handleDeleteUser = async (user: any) => {
+  const handleDeleteUser = async (user: UserProfile) => {
     if (!window.confirm(`Are you sure you want to delete ${user.email} from registered users?`)) return;
-    setDeletingId(user.id);
+    setDeletingId(user.uid);
     try {
-      const { error } = await supabase
-        .from('users')
-        .delete()
-        .eq('id', user.id);
-
-      if (error) throw error;
+      await dbService.deleteUser(user.uid);
       setSuccess(`User ${user.email} deleted.`);
+      fetchUsers();
     } catch (err: any) {
       console.error("Error deleting user:", err);
     } finally {
@@ -174,23 +122,16 @@ export default function AdminDashboard() {
     e.preventDefault();
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      const { error } = await supabase
-        .from('potholes')
-        .insert({
-          latitude: parseFloat(newPothole.latitude),
-          longitude: parseFloat(newPothole.longitude),
-          severity: newPothole.severity,
-          address: newPothole.address || 'Manual Entry',
-          status: 'reported',
-          timestamp: new Date().toISOString(),
-          user_id: user?.id || 'admin',
-          user_name: 'Admin Manual Entry'
-        });
-
-      if (error) throw error;
-
+      await dbService.addPothole({
+        latitude: parseFloat(newPothole.latitude),
+        longitude: parseFloat(newPothole.longitude),
+        severity: newPothole.severity,
+        address: newPothole.address || 'Manual Entry',
+        status: 'reported',
+        timestamp: new Date().toISOString(),
+        userId: auth.currentUser?.uid || 'admin',
+        userName: 'Admin Manual Entry'
+      });
       setShowAddPothole(false);
       setNewPothole({ latitude: '', longitude: '', severity: 'medium', address: '' });
       setSuccess('Pothole manually added to system.');
@@ -204,12 +145,7 @@ export default function AdminDashboard() {
   const handleDeletePothole = async (id: string) => {
     if (!window.confirm('Delete this pothole report permanently?')) return;
     try {
-      const { error } = await supabase
-        .from('potholes')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      await dbService.deletePothole(id);
       setSuccess('Pothole report removed.');
     } catch (err: any) {
       console.error("Error deleting pothole:", err);
