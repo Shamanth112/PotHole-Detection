@@ -74,28 +74,35 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       try {
         if (user) {
+          // Set user immediately so the UI can start rendering the logged-in state
+          setUser(user);
+          
           let role: 'user' | 'admin' | 'municipal' = 'user';
           const isDefaultAdmin = user.email === "shamanth.p2007@gmail.com";
           
-          // Check permitted_users table for assigned role
-          const permitted = await dbService.getPermittedUser(user.email || '');
-          
-          if (permitted) {
-            role = permitted.role;
-          } else if (isDefaultAdmin) {
-            role = 'admin';
+          try {
+            // Check permitted_users table for assigned role
+            const permitted = await dbService.getPermittedUser(user.email || '');
+            
+            if (permitted) {
+              role = permitted.role;
+            } else if (isDefaultAdmin) {
+              role = 'admin';
+            }
+
+            // Sync with users table
+            await dbService.upsertUserProfile({
+              uid: user.uid,
+              displayName: user.displayName || undefined,
+              email: user.email || '',
+              photoURL: user.photoURL || undefined,
+              role: role
+            });
+          } catch (dbError) {
+            console.error("Database sync error:", dbError);
+            // Fallback to 'user' role if DB sync fails
           }
 
-          // Sync with users table
-          await dbService.upsertUserProfile({
-            uid: user.uid,
-            displayName: user.displayName || undefined,
-            email: user.email || '',
-            photoURL: user.photoURL || undefined,
-            role: role
-          });
-
-          setUser(user);
           setUserRole(role);
         } else {
           setUser(null);
@@ -113,6 +120,7 @@ export default function App() {
   const handleLogin = async () => {
     const provider = new GoogleAuthProvider();
     try {
+      // Use signInWithPopup for better iframe compatibility
       await signInWithPopup(auth, provider);
     } catch (error: any) {
       // Ignore common user-cancellation errors
@@ -210,8 +218,17 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-black">
+      <div className="flex flex-col items-center justify-center h-screen bg-black gap-6">
         <div className="w-16 h-16 border-4 border-red-500/20 border-t-red-500 rounded-full animate-spin" />
+        <div className="text-center space-y-2">
+          <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">Initializing RoadGuard...</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="text-[10px] text-zinc-600 hover:text-zinc-400 underline uppercase tracking-tighter"
+          >
+            Taking too long? Click to refresh
+          </button>
+        </div>
       </div>
     );
   }
@@ -295,6 +312,18 @@ export default function App() {
                   <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="Google" />
                   Continue with Google
                 </button>
+                
+                <div className="pt-4 space-y-2">
+                  <p className="text-[10px] text-white/40 font-medium">
+                    Trouble logging in? Make sure third-party cookies are enabled or try opening the app in a new tab.
+                  </p>
+                  <button 
+                    onClick={() => window.location.reload()}
+                    className="text-[10px] text-white/60 hover:text-white underline uppercase tracking-tighter"
+                  >
+                    Refresh Status
+                  </button>
+                </div>
               </div>
 
               <p className="text-[10px] text-white/40 font-medium pt-12">
