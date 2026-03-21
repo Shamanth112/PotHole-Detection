@@ -62,6 +62,7 @@ service cloud.firestore {
 
     function isValidPothole(data) {
       return data.keys().hasAll(['latitude', 'longitude', 'timestamp', 'userId']) &&
+             data.keys().hasOnly(['latitude', 'longitude', 'timestamp', 'userId', 'severity', 'reportImageUrl', 'resolvedImageUrl', 'address', 'status', 'userName', 'notes']) &&
              data.latitude is number &&
              data.longitude is number &&
              data.timestamp is timestamp &&
@@ -69,7 +70,9 @@ service cloud.firestore {
              (!('reportImageUrl' in data) || (data.reportImageUrl is string && data.reportImageUrl.size() < 2048)) &&
              (!('resolvedImageUrl' in data) || (data.resolvedImageUrl is string && data.resolvedImageUrl.size() < 2048)) &&
              (!('address' in data) || (data.address is string && data.address.size() < 500)) &&
-             (!('status' in data) || data.status in ['reported', 'verified', 'fixing', 'resolved']);
+             (!('status' in data) || data.status in ['reported', 'verified', 'fixing', 'resolved']) &&
+             (!('userName' in data) || (data.userName is string && data.userName.size() < 100)) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() < 2000));
     }
 
     function isValidUser(data) {

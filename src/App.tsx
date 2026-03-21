@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { auth, db } from './firebase';
 import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, User, updateProfile } from 'firebase/auth';
 import { doc, setDoc, getDoc, collection, addDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from './utils/errorHandlers';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import HomeView from './components/HomeView';
 import ReportView from './components/ReportView';
@@ -164,7 +165,7 @@ export default function App() {
     }
   };
 
-  const handleReportPothole = async (data: { latitude: number; longitude: number; severity: string; address?: string; reportImageUrl?: string }, isAuto = false) => {
+  const handleReportPothole = async (data: { latitude: number; longitude: number; severity: string; address?: string; reportImageUrl?: string; notes?: string }, isAuto = false) => {
     if (!user) return;
     try {
       await addDoc(collection(db, 'potholes'), {
@@ -185,7 +186,7 @@ export default function App() {
         });
       }
     } catch (error) {
-      console.error("Error reporting pothole:", error);
+      handleFirestoreError(error, OperationType.WRITE, 'potholes');
     }
   };
 

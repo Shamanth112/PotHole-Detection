@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
 import { collection, getDocs, doc, setDoc, deleteDoc, query, onSnapshot, orderBy, limit, Timestamp, addDoc } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from '../utils/errorHandlers';
 import { 
   UserPlus, Users, ShieldCheck, Mail, Trash2, Loader2, 
   LayoutDashboard, MapPin, Plus, AlertTriangle, CheckCircle2, Clock, 
@@ -62,7 +63,7 @@ export default function AdminDashboard() {
       usersList.sort((a: any, b: any) => (a.email || '').localeCompare(b.email || ''));
       setUsers(usersList);
     } catch (err) {
-      console.error("Error fetching users:", err);
+      handleFirestoreError(err, OperationType.GET, 'users');
     }
   };
 
@@ -83,7 +84,7 @@ export default function AdminDashboard() {
       setNewEmail('');
       setSuccess(`Successfully added ${emailKey} as ${newRole}.`);
     } catch (err: any) {
-      setError(err.message);
+      handleFirestoreError(err, OperationType.WRITE, `permitted_users/${newEmail}`);
     } finally {
       setLoading(false);
     }
@@ -95,7 +96,7 @@ export default function AdminDashboard() {
       await deleteDoc(doc(db, 'permitted_users', email));
       setSuccess(`Permissions removed for ${email}.`);
     } catch (err: any) {
-      setError(`Failed to remove permissions: ${err.message}`);
+      handleFirestoreError(err, OperationType.DELETE, `permitted_users/${email}`);
     }
   };
 
@@ -107,7 +108,7 @@ export default function AdminDashboard() {
       setSuccess(`User ${user.email} deleted.`);
       fetchUsers();
     } catch (err: any) {
-      setError(`Failed to delete user: ${err.message}`);
+      handleFirestoreError(err, OperationType.DELETE, `users/${user.id}`);
     } finally {
       setDeletingId(null);
     }
@@ -131,7 +132,7 @@ export default function AdminDashboard() {
       setNewPothole({ latitude: '', longitude: '', severity: 'medium', address: '' });
       setSuccess('Pothole manually added to system.');
     } catch (err: any) {
-      setError(err.message);
+      handleFirestoreError(err, OperationType.WRITE, 'potholes');
     } finally {
       setLoading(false);
     }
@@ -143,7 +144,7 @@ export default function AdminDashboard() {
       await deleteDoc(doc(db, 'potholes', id));
       setSuccess('Pothole report removed.');
     } catch (err: any) {
-      setError(err.message);
+      handleFirestoreError(err, OperationType.DELETE, `potholes/${id}`);
     }
   };
 
