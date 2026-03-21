@@ -233,412 +233,385 @@ export default function App() {
     );
   }
 
-  return (
-    <Routes>
-      <Route path="/admin" element={
-        user && userRole === 'admin' ? (
-          <div className="min-h-screen bg-black text-white">
-            <header className="h-16 border-b border-zinc-800 bg-black/50 backdrop-blur-xl flex items-center justify-between px-6 sticky top-0 z-50">
-              <div className="flex items-center gap-3">
-                <ShieldCheck className="w-6 h-6 text-emerald-500" />
-                <span className="font-black text-xl tracking-tighter uppercase italic">Admin Console</span>
-              </div>
-              <button onClick={() => navigate('/')} className="text-zinc-400 hover:text-white flex items-center gap-2 text-sm">
-                <ArrowLeft className="w-4 h-4" /> Back to App
+  // Login Screen
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-[#1a365d] flex flex-col items-center justify-center p-6 text-white font-sans">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-md text-center space-y-8"
+        >
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-24 h-24 bg-white/10 rounded-3xl flex items-center justify-center backdrop-blur-xl border border-white/20 shadow-2xl">
+              <Shield className="w-12 h-12 text-white" />
+            </div>
+            <h1 className="text-4xl font-black tracking-tighter">RoadGuard</h1>
+            <p className="text-blue-100/70 text-sm font-medium max-w-[240px] mx-auto">
+              AI-Powered Pothole Detection & Road Safety Management
+            </p>
+          </div>
+
+          <div className="space-y-4 pt-8">
+            <button 
+              onClick={handleLogin}
+              className="w-full bg-white text-[#1a365d] py-4 rounded-2xl font-bold flex items-center justify-center gap-3 shadow-xl hover:bg-blue-50 transition-all active:scale-95"
+            >
+              <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="Google" />
+              Continue with Google
+            </button>
+            
+            <div className="pt-4 space-y-2">
+              <p className="text-[10px] text-white/40 font-medium">
+                Trouble logging in? Make sure third-party cookies are enabled or try opening the app in a new tab.
+              </p>
+              <button 
+                onClick={() => window.location.reload()}
+                className="text-[10px] text-white/60 hover:text-white underline uppercase tracking-tighter"
+              >
+                Refresh Status
               </button>
-            </header>
-            <div className="p-6">
-              <AdminDashboard />
             </div>
           </div>
-        ) : <Navigate to="/" />
-      } />
 
-      <Route path="/municipal" element={
-        user && (userRole === 'municipal' || userRole === 'admin') ? (
-          <div className="min-h-screen bg-black text-white">
-            <header className="h-16 border-b border-zinc-800 bg-black/50 backdrop-blur-xl flex items-center justify-between px-6 sticky top-0 z-50">
-              <div className="flex items-center gap-3">
-                <ShieldAlert className="w-6 h-6 text-blue-500" />
-                <span className="font-black text-xl tracking-tighter uppercase italic">Municipal Dashboard</span>
-              </div>
-              <button onClick={() => navigate('/')} className="text-zinc-400 hover:text-white flex items-center gap-2 text-sm">
-                <ArrowLeft className="w-4 h-4" /> Back to App
-              </button>
-            </header>
-            <MunicipalDashboard potholes={potholes} />
+          <p className="text-[10px] text-white/40 font-medium pt-12">
+            By continuing, you agree to our Terms & Privacy Policy
+          </p>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Staff View (Municipal & Admin)
+  if (userRole === 'municipal' || userRole === 'admin') {
+    return (
+      <div className="min-h-screen bg-black">
+        <header className="h-16 border-b border-zinc-800 bg-black/50 backdrop-blur-xl flex items-center justify-between px-6 sticky top-0 z-50">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-blue-600">
+              <ShieldAlert className="w-5 h-5 text-white" />
+            </div>
+            <span className="font-black text-xl tracking-tighter uppercase italic text-white">
+              Pothole<span className="text-blue-600">Detection</span> IDP
+            </span>
           </div>
-        ) : <Navigate to="/" />
-      } />
+          <div className="flex items-center gap-4">
+            <Routes>
+              <Route path="/admin" element={
+                <button 
+                  onClick={() => navigate('/')}
+                  className="text-xs font-bold text-zinc-400 hover:text-white flex items-center gap-2 bg-zinc-900 px-3 py-1.5 rounded-lg border border-zinc-800"
+                >
+                  <ArrowLeft className="w-4 h-4" /> Back to Feed
+                </button>
+              } />
+              <Route path="/" element={
+                userRole === 'admin' && (
+                  <button 
+                    onClick={() => navigate('/admin')}
+                    className="text-xs font-bold text-zinc-400 hover:text-white flex items-center gap-2 bg-zinc-900 px-3 py-1.5 rounded-lg border border-zinc-800"
+                  >
+                    <ShieldCheck className="w-4 h-4 text-emerald-500" /> Admin Console
+                  </button>
+                )
+              } />
+            </Routes>
+            <button onClick={handleLogout} className="p-2 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-white">
+              <LogOut className="w-5 h-5" />
+            </button>
+            <img src={user.photoURL || `https://ui-avatars.com/api/?name=${user.email}`} className="w-8 h-8 rounded-full border border-zinc-700" alt="User" />
+          </div>
+        </header>
 
-      <Route path="/" element={
-        !user ? (
-          <div className="min-h-screen bg-[#1a365d] flex flex-col items-center justify-center p-6 text-white font-sans">
+        <Routes>
+          <Route path="/admin" element={userRole === 'admin' ? <div className="p-6"><AdminDashboard /></div> : <Navigate to="/" />} />
+          <Route path="/" element={<MunicipalDashboard potholes={potholes} />} />
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
+      </div>
+    );
+  }
+
+  // Citizen View
+  return (
+    <div className="min-h-screen bg-[#f7fafc] flex font-sans relative overflow-hidden">
+      {/* Desktop Sidebar */}
+      <aside className="hidden md:flex flex-col w-64 bg-[#1a365d] text-white p-6 sticky top-0 h-screen shadow-2xl z-50">
+        <div className="flex items-center gap-3 mb-12">
+          <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-xl border border-white/20">
+            <Shield className="w-6 h-6 text-white" />
+          </div>
+          <span className="font-black text-xl tracking-tighter uppercase italic">RoadGuard</span>
+        </div>
+
+        <nav className="flex-1 space-y-2">
+          <SidebarButton 
+            active={activeTab === 'home'} 
+            onClick={() => setActiveTab('home')} 
+            icon={<HomeIcon className="w-5 h-5" />} 
+            label="Dashboard" 
+          />
+          <SidebarButton 
+            active={activeTab === 'map'} 
+            onClick={() => setActiveTab('map')} 
+            icon={<MapIcon className="w-5 h-5" />} 
+            label="Live Map" 
+          />
+          <SidebarButton 
+            active={activeTab === 'history'} 
+            onClick={() => setActiveTab('history')} 
+            icon={<History className="w-5 h-5" />} 
+            label="Report History" 
+          />
+          <SidebarButton 
+            active={activeTab === 'scan'} 
+            onClick={() => setActiveTab('scan')} 
+            icon={<Scan className="w-5 h-5" />} 
+            label="AI Scanner" 
+          />
+          <SidebarButton 
+            active={activeTab === 'profile'} 
+            onClick={() => setActiveTab('profile')} 
+            icon={<UserIcon className="w-5 h-5" />} 
+            label="My Profile" 
+          />
+        </nav>
+
+        <div className="mt-auto pt-6 border-t border-white/10">
+          <div className="flex items-center gap-3 mb-6">
+            <img 
+              src={user.photoURL || `https://ui-avatars.com/api/?name=${user.email}`} 
+              className="w-10 h-10 rounded-xl border border-white/20"
+              alt="User"
+            />
+            <div className="min-w-0">
+              <p className="font-bold text-sm truncate">{user.displayName || 'Guardian'}</p>
+              <p className="text-[10px] text-blue-200/50 truncate">{user.email}</p>
+            </div>
+          </div>
+          <button 
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 p-3 text-red-400 hover:bg-red-500/10 rounded-xl transition-all text-sm font-bold"
+          >
+            <LogOut className="w-5 h-5" />
+            Sign Out
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Content Area */}
+      <main className="flex-1 relative overflow-hidden pb-20 md:pb-0">
+        <div className="h-full max-w-6xl mx-auto">
+          <AnimatePresence mode="wait">
+          {activeTab === 'home' && (
             <motion.div 
+              key="home"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              className="h-full"
+            >
+              <HomeView 
+                userRole={userRole}
+                onStartDetection={() => setActiveTab('scan')}
+                onReportManually={() => setActiveTab('report')}
+                stats={{
+                  detectedToday: potholes.filter(p => {
+                    const today = new Date();
+                    const pDate = new Date(p.timestamp);
+                    return pDate.toDateString() === today.toDateString();
+                  }).length,
+                  fixedThisWeek: potholes.filter(p => p.status === 'resolved').length
+                }}
+              />
+            </motion.div>
+          )}
+
+          {activeTab === 'map' && (
+            <motion.div 
+              key="map"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="h-full"
+            >
+              <MapView potholes={potholes} onAddReport={() => setActiveTab('report')} />
+            </motion.div>
+          )}
+
+          {activeTab === 'history' && (
+            <motion.div 
+              key="history"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="w-full max-w-md text-center space-y-8"
+              exit={{ opacity: 0, y: -20 }}
+              className="h-full"
             >
-              <div className="flex flex-col items-center gap-4">
-                <div className="w-24 h-24 bg-white/10 rounded-3xl flex items-center justify-center backdrop-blur-xl border border-white/20 shadow-2xl">
-                  <Shield className="w-12 h-12 text-white" />
-                </div>
-                <h1 className="text-4xl font-black tracking-tighter">RoadGuard</h1>
-                <p className="text-blue-100/70 text-sm font-medium max-w-[240px] mx-auto">
-                  AI-Powered Pothole Detection & Road Safety Management
-                </p>
-              </div>
+              <PotholeList potholes={potholes} />
+            </motion.div>
+          )}
 
-              <div className="space-y-4 pt-8">
-                <button 
-                  onClick={handleLogin}
-                  className="w-full bg-white text-[#1a365d] py-4 rounded-2xl font-bold flex items-center justify-center gap-3 shadow-xl hover:bg-blue-50 transition-all active:scale-95"
-                >
-                  <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="Google" />
-                  Continue with Google
-                </button>
-                
-                <div className="pt-4 space-y-2">
-                  <p className="text-[10px] text-white/40 font-medium">
-                    Trouble logging in? Make sure third-party cookies are enabled or try opening the app in a new tab.
-                  </p>
-                  <button 
-                    onClick={() => window.location.reload()}
-                    className="text-[10px] text-white/60 hover:text-white underline uppercase tracking-tighter"
-                  >
-                    Refresh Status
+          {activeTab === 'scan' && (
+            <motion.div 
+              key="scan"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 1.05 }}
+              className="h-full"
+            >
+              <CameraView 
+                onDetection={handleDetection} 
+                onBack={() => setActiveTab('home')} 
+                gpsActive={!!userLocation}
+              />
+            </motion.div>
+          )}
+
+          {activeTab === 'report' && (
+            <motion.div 
+              key="report"
+              initial={{ opacity: 0, y: 100 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 100 }}
+              className="h-full"
+            >
+              <ReportView 
+                onBack={() => setActiveTab('home')} 
+                onSubmit={(data) => handleReportPothole(data)} 
+              />
+            </motion.div>
+          )}
+
+          {activeTab === 'profile' && (
+            <motion.div 
+              key="profile"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="h-full bg-white flex flex-col"
+            >
+              <header className="bg-[#1a365d] text-white p-8 pb-20 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full -mr-20 -mt-20 blur-3xl" />
+                <div className="flex justify-between items-start mb-6">
+                  <h1 className="text-2xl font-bold tracking-tight">My Profile</h1>
+                  <button className="p-2 bg-white/10 rounded-full">
+                    <Settings className="w-5 h-5" />
                   </button>
                 </div>
-              </div>
-
-              <p className="text-[10px] text-white/40 font-medium pt-12">
-                By continuing, you agree to our Terms & Privacy Policy
-              </p>
-
-            </motion.div>
-          </div>
-        ) : (
-          <div className="min-h-screen bg-[#f7fafc] flex font-sans relative overflow-hidden">
-            {/* Desktop Sidebar */}
-            <aside className="hidden md:flex flex-col w-64 bg-[#1a365d] text-white p-6 sticky top-0 h-screen shadow-2xl z-50">
-              <div className="flex items-center gap-3 mb-12">
-                <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-xl border border-white/20">
-                  <Shield className="w-6 h-6 text-white" />
-                </div>
-                <span className="font-black text-xl tracking-tighter uppercase italic">RoadGuard</span>
-              </div>
-
-              <nav className="flex-1 space-y-2">
-                <SidebarButton 
-                  active={activeTab === 'home'} 
-                  onClick={() => setActiveTab('home')} 
-                  icon={<HomeIcon className="w-5 h-5" />} 
-                  label="Dashboard" 
-                />
-                <SidebarButton 
-                  active={activeTab === 'map'} 
-                  onClick={() => setActiveTab('map')} 
-                  icon={<MapIcon className="w-5 h-5" />} 
-                  label="Live Map" 
-                />
-                <SidebarButton 
-                  active={activeTab === 'history'} 
-                  onClick={() => setActiveTab('history')} 
-                  icon={<History className="w-5 h-5" />} 
-                  label="Report History" 
-                />
-                <SidebarButton 
-                  active={activeTab === 'scan'} 
-                  onClick={() => setActiveTab('scan')} 
-                  icon={<Scan className="w-5 h-5" />} 
-                  label="AI Scanner" 
-                />
-                <SidebarButton 
-                  active={activeTab === 'profile'} 
-                  onClick={() => setActiveTab('profile')} 
-                  icon={<UserIcon className="w-5 h-5" />} 
-                  label="My Profile" 
-                />
-                {(userRole === 'municipal' || userRole === 'admin') && (
-                  <SidebarButton 
-                    active={false} 
-                    onClick={() => navigate('/municipal')} 
-                    icon={<ShieldAlert className="w-5 h-5 text-blue-400" />} 
-                    label="Municipal Dashboard" 
-                  />
-                )}
-                {userRole === 'admin' && (
-                  <SidebarButton 
-                    active={false} 
-                    onClick={() => navigate('/admin')} 
-                    icon={<ShieldCheck className="w-5 h-5 text-emerald-500" />} 
-                    label="Admin Console" 
-                  />
-                )}
-              </nav>
-
-              <div className="mt-auto pt-6 border-t border-white/10">
-                <div className="flex items-center gap-3 mb-6">
-                  <img 
-                    src={user.photoURL || `https://ui-avatars.com/api/?name=${user.email}`} 
-                    className="w-10 h-10 rounded-xl border border-white/20"
-                    alt="User"
-                  />
-                  <div className="min-w-0">
-                    <p className="font-bold text-sm truncate">{user.displayName || 'Guardian'}</p>
-                    <p className="text-[10px] text-blue-200/50 truncate">{user.email}</p>
+                
+                <div className="flex items-center gap-4">
+                  <div className="relative group">
+                    <div className="w-20 h-20 rounded-3xl border-4 border-white/20 overflow-hidden shadow-2xl">
+                      <img 
+                        src={user.photoURL || `https://ui-avatars.com/api/?name=${user.email}`} 
+                        className="w-full h-full object-cover"
+                        alt="Profile"
+                      />
+                    </div>
+                    <label className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded-3xl">
+                      <Camera className="w-6 h-6 text-white" />
+                      <input type="file" className="hidden" accept="image/*" onChange={handleProfilePhotoUpload} />
+                    </label>
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold">{user.displayName || 'Road Guardian'}</h2>
+                    <p className="text-blue-100/60 text-xs font-medium">{user.email}</p>
+                    <div className="mt-2 flex items-center gap-2 bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider">
+                      <Award className="w-3 h-3" />
+                      Elite Reporter
+                    </div>
                   </div>
                 </div>
-                <button 
-                  onClick={handleLogout}
-                  className="w-full flex items-center gap-3 p-3 text-red-400 hover:bg-red-500/10 rounded-xl transition-all text-sm font-bold"
-                >
-                  <LogOut className="w-5 h-5" />
-                  Sign Out
-                </button>
+              </header>
+
+              <div className="flex-1 p-6 -mt-12 bg-white rounded-t-[40px] shadow-2xl space-y-8 overflow-y-auto">
+                {/* Stats Cards */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-[#f7fafc] p-5 rounded-3xl border border-[#e2e8f0] flex flex-col items-center text-center">
+                    <p className="text-3xl font-black text-[#1a365d] mb-1">{potholes.filter(p => p.userId === user.uid).length}</p>
+                    <p className="text-[10px] font-bold text-[#718096] uppercase tracking-widest">Reports</p>
+                  </div>
+                  <div className="bg-[#f7fafc] p-5 rounded-3xl border border-[#e2e8f0] flex flex-col items-center text-center">
+                    <p className="text-3xl font-black text-[#1a365d] mb-1">{potholes.filter(p => p.userId === user.uid).length * 50}</p>
+                    <p className="text-[10px] font-bold text-[#718096] uppercase tracking-widest">Points</p>
+                  </div>
+                </div>
+
+                {/* Menu Sections */}
+                <section className="space-y-4">
+                  <h3 className="text-xs font-black text-[#a0aec0] uppercase tracking-[0.2em] px-2">Account Settings</h3>
+                  <div className="space-y-2">
+                    <ProfileMenuItem icon={<Bell className="w-5 h-5" />} label="Notifications" />
+                    <ProfileMenuItem icon={<Shield className="w-5 h-5" />} label="Privacy & Security" />
+                    <ProfileMenuItem icon={<Award className="w-5 h-5" />} label="My Achievements" />
+                  </div>
+                </section>
+
+                <section className="space-y-4">
+                  <h3 className="text-xs font-black text-[#a0aec0] uppercase tracking-[0.2em] px-2">Support</h3>
+                  <div className="space-y-2">
+                    <ProfileMenuItem icon={<InfoIcon className="w-5 h-5" />} label="Help Center" />
+                    <button 
+                      onClick={handleLogout}
+                      className="w-full flex items-center justify-between p-4 bg-red-50 text-red-600 rounded-2xl font-bold hover:bg-red-100 transition-all"
+                    >
+                      <div className="flex items-center gap-3">
+                        <LogOut className="w-5 h-5" />
+                        <span>Sign Out</span>
+                      </div>
+                      <ChevronRight className="w-4 h-4 opacity-50" />
+                    </button>
+                  </div>
+                </section>
               </div>
-            </aside>
+            </motion.div>
+          )}
+          </AnimatePresence>
+        </div>
+      </main>
 
-            {/* Main Content Area */}
-            <main className="flex-1 relative overflow-hidden pb-20 md:pb-0">
-              <div className="h-full max-w-6xl mx-auto">
-                <AnimatePresence mode="wait">
-                {activeTab === 'home' && (
-                  <motion.div 
-                    key="home"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 20 }}
-                    className="h-full"
-                  >
-                    <HomeView 
-                      userRole={userRole}
-                      onStartDetection={() => setActiveTab('scan')}
-                      onReportManually={() => setActiveTab('report')}
-                      stats={{
-                        detectedToday: potholes.filter(p => {
-                          const today = new Date();
-                          const pDate = new Date(p.timestamp);
-                          return pDate.toDateString() === today.toDateString();
-                        }).length,
-                        fixedThisWeek: potholes.filter(p => p.status === 'resolved').length
-                      }}
-                    />
-                  </motion.div>
-                )}
+      {/* Bottom Navigation (Mobile Only) */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-[#e2e8f0] px-6 py-3 flex justify-between items-center z-50 shadow-[0_-10px_20px_-5px_rgba(0,0,0,0.05)]">
+        <NavButton 
+          active={activeTab === 'home'} 
+          onClick={() => setActiveTab('home')} 
+          icon={<HomeIcon className="w-6 h-6" />} 
+          label="Home" 
+        />
+        <NavButton 
+          active={activeTab === 'map'} 
+          onClick={() => setActiveTab('map')} 
+          icon={<MapIcon className="w-6 h-6" />} 
+          label="Map" 
+        />
+        
+        {/* Central Scan Button */}
+        <div className="relative -mt-12">
+          <button 
+            onClick={() => setActiveTab('scan')}
+            className={`w-16 h-16 rounded-full flex items-center justify-center shadow-2xl transition-all active:scale-90 ${
+              activeTab === 'scan' ? 'bg-[#1a365d] text-white' : 'bg-[#1a365d] text-white'
+            }`}
+          >
+            <Scan className="w-8 h-8" />
+          </button>
+          <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] font-bold text-[#1a365d] uppercase tracking-widest">Scan</span>
+        </div>
 
-                {activeTab === 'map' && (
-                  <motion.div 
-                    key="map"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="h-full"
-                  >
-                    <MapView potholes={potholes} onAddReport={() => setActiveTab('report')} />
-                  </motion.div>
-                )}
-
-                {activeTab === 'history' && (
-                  <motion.div 
-                    key="history"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    className="h-full"
-                  >
-                    <PotholeList potholes={potholes} />
-                  </motion.div>
-                )}
-
-                {activeTab === 'scan' && (
-                  <motion.div 
-                    key="scan"
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 1.05 }}
-                    className="h-full"
-                  >
-                    <CameraView 
-                      onDetection={handleDetection} 
-                      onBack={() => setActiveTab('home')} 
-                      gpsActive={!!userLocation}
-                    />
-                  </motion.div>
-                )}
-
-                {activeTab === 'report' && (
-                  <motion.div 
-                    key="report"
-                    initial={{ opacity: 0, y: 100 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 100 }}
-                    className="h-full"
-                  >
-                    <ReportView 
-                      onBack={() => setActiveTab('home')} 
-                      onSubmit={(data) => handleReportPothole(data)} 
-                    />
-                  </motion.div>
-                )}
-
-                {activeTab === 'profile' && (
-                  <motion.div 
-                    key="profile"
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    className="h-full bg-white flex flex-col"
-                  >
-                    <header className="bg-[#1a365d] text-white p-8 pb-20 relative overflow-hidden">
-                      <div className="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full -mr-20 -mt-20 blur-3xl" />
-                      <div className="flex justify-between items-start mb-6">
-                        <h1 className="text-2xl font-bold tracking-tight">My Profile</h1>
-                        <button className="p-2 bg-white/10 rounded-full">
-                          <Settings className="w-5 h-5" />
-                        </button>
-                      </div>
-                      
-                      <div className="flex items-center gap-4">
-                        <div className="relative group">
-                          <div className="w-20 h-20 rounded-3xl border-4 border-white/20 overflow-hidden shadow-2xl">
-                            <img 
-                              src={user.photoURL || `https://ui-avatars.com/api/?name=${user.email}`} 
-                              className="w-full h-full object-cover"
-                              alt="Profile"
-                            />
-                          </div>
-                          <label className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded-3xl">
-                            <Camera className="w-6 h-6 text-white" />
-                            <input type="file" className="hidden" accept="image/*" onChange={handleProfilePhotoUpload} />
-                          </label>
-                        </div>
-                        <div>
-                          <h2 className="text-xl font-bold">{user.displayName || 'Road Guardian'}</h2>
-                          <p className="text-blue-100/60 text-xs font-medium">{user.email}</p>
-                          <div className="mt-2 flex items-center gap-2 bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider">
-                            <Award className="w-3 h-3" />
-                            Elite Reporter
-                          </div>
-                        </div>
-                      </div>
-                    </header>
-
-                    <div className="flex-1 p-6 -mt-12 bg-white rounded-t-[40px] shadow-2xl space-y-8 overflow-y-auto">
-                      {/* Stats Cards */}
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-[#f7fafc] p-5 rounded-3xl border border-[#e2e8f0] flex flex-col items-center text-center">
-                          <p className="text-3xl font-black text-[#1a365d] mb-1">{potholes.filter(p => p.userId === user.uid).length}</p>
-                          <p className="text-[10px] font-bold text-[#718096] uppercase tracking-widest">Reports</p>
-                        </div>
-                        <div className="bg-[#f7fafc] p-5 rounded-3xl border border-[#e2e8f0] flex flex-col items-center text-center">
-                          <p className="text-3xl font-black text-[#1a365d] mb-1">{potholes.filter(p => p.userId === user.uid).length * 50}</p>
-                          <p className="text-[10px] font-bold text-[#718096] uppercase tracking-widest">Points</p>
-                        </div>
-                      </div>
-
-                      {/* Menu Sections */}
-                      <section className="space-y-4">
-                        <h3 className="text-xs font-black text-[#a0aec0] uppercase tracking-[0.2em] px-2">Account Settings</h3>
-                        <div className="space-y-2">
-                          <ProfileMenuItem icon={<Bell className="w-5 h-5" />} label="Notifications" />
-                          <ProfileMenuItem icon={<Shield className="w-5 h-5" />} label="Privacy & Security" />
-                          <ProfileMenuItem icon={<Award className="w-5 h-5" />} label="My Achievements" />
-                          {(userRole === 'municipal' || userRole === 'admin') && (
-                            <button 
-                              onClick={() => navigate('/municipal')}
-                              className="w-full flex items-center justify-between p-4 bg-blue-50 text-blue-600 rounded-2xl font-bold hover:bg-blue-100 transition-all"
-                            >
-                              <div className="flex items-center gap-3">
-                                <ShieldAlert className="w-5 h-5" />
-                                <span>Municipal Dashboard</span>
-                              </div>
-                              <ChevronRight className="w-4 h-4 opacity-50" />
-                            </button>
-                          )}
-                          {userRole === 'admin' && (
-                            <button 
-                              onClick={() => navigate('/admin')}
-                              className="w-full flex items-center justify-between p-4 bg-emerald-50 text-emerald-600 rounded-2xl font-bold hover:bg-emerald-100 transition-all"
-                            >
-                              <div className="flex items-center gap-3">
-                                <ShieldCheck className="w-5 h-5" />
-                                <span>Admin Console</span>
-                              </div>
-                              <ChevronRight className="w-4 h-4 opacity-50" />
-                            </button>
-                          )}
-                        </div>
-                      </section>
-
-                      <section className="space-y-4">
-                        <h3 className="text-xs font-black text-[#a0aec0] uppercase tracking-[0.2em] px-2">Support</h3>
-                        <div className="space-y-2">
-                          <ProfileMenuItem icon={<InfoIcon className="w-5 h-5" />} label="Help Center" />
-                          <button 
-                            onClick={handleLogout}
-                            className="w-full flex items-center justify-between p-4 bg-red-50 text-red-600 rounded-2xl font-bold hover:bg-red-100 transition-all"
-                          >
-                            <div className="flex items-center gap-3">
-                              <LogOut className="w-5 h-5" />
-                              <span>Sign Out</span>
-                            </div>
-                            <ChevronRight className="w-4 h-4 opacity-50" />
-                          </button>
-                        </div>
-                      </section>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </main>
-
-            {/* Bottom Navigation (Mobile Only) */}
-            <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-[#e2e8f0] px-6 py-3 flex justify-between items-center z-50 shadow-[0_-10px_20px_-5px_rgba(0,0,0,0.05)]">
-              <NavButton 
-                active={activeTab === 'home'} 
-                onClick={() => setActiveTab('home')} 
-                icon={<HomeIcon className="w-6 h-6" />} 
-                label="Home" 
-              />
-              <NavButton 
-                active={activeTab === 'map'} 
-                onClick={() => setActiveTab('map')} 
-                icon={<MapIcon className="w-6 h-6" />} 
-                label="Map" 
-              />
-              
-              {/* Central Scan Button */}
-              <div className="relative -mt-12">
-                <button 
-                  onClick={() => setActiveTab('scan')}
-                  className={`w-16 h-16 rounded-full flex items-center justify-center shadow-2xl transition-all active:scale-90 ${
-                    activeTab === 'scan' ? 'bg-[#1a365d] text-white' : 'bg-[#1a365d] text-white'
-                  }`}
-                >
-                  <Scan className="w-8 h-8" />
-                </button>
-                <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] font-bold text-[#1a365d] uppercase tracking-widest">Scan</span>
-              </div>
-
-              <NavButton 
-                active={activeTab === 'history'} 
-                onClick={() => setActiveTab('history')} 
-                icon={<History className="w-6 h-6" />} 
-                label="History" 
-              />
-              <NavButton 
-                active={activeTab === 'profile'} 
-                onClick={() => setActiveTab('profile')} 
-                icon={<UserIcon className="w-6 h-6" />} 
-                label="Profile" 
-              />
-            </nav>
-          </div>
-        )
-      } />
-    </Routes>
+        <NavButton 
+          active={activeTab === 'history'} 
+          onClick={() => setActiveTab('history')} 
+          icon={<History className="w-6 h-6" />} 
+          label="History" 
+        />
+        <NavButton 
+          active={activeTab === 'profile'} 
+          onClick={() => setActiveTab('profile')} 
+          icon={<UserIcon className="w-6 h-6" />} 
+          label="Profile" 
+        />
+      </nav>
+    </div>
   );
 }
 
