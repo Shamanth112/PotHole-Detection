@@ -101,7 +101,11 @@ service cloud.firestore {
     }
 
     match /potholes/{potholeId} {
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated() && (
+        isAdmin() || 
+        isMunicipal() || 
+        resource.data.userId == request.auth.uid
+      );
       allow create: if isAuthenticated() && isValidPothole(request.resource.data) && request.resource.data.userId == request.auth.uid;
       allow update: if isAuthenticated() && (
         isAdmin() || 
