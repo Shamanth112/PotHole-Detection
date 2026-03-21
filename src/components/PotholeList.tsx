@@ -49,6 +49,13 @@ export default function PotholeList({ potholes }: PotholeListProps) {
                   }`}>
                     {p.severity}
                   </span>
+                  <span className={`text-[10px] font-black uppercase px-1.5 py-0.5 rounded ml-2 ${
+                    p.status === 'resolved' ? 'bg-emerald-500 text-white' : 
+                    p.status === 'fixing' ? 'bg-blue-500 text-white' : 
+                    p.status === 'verified' ? 'bg-purple-500 text-white' : 'bg-zinc-700 text-white'
+                  }`}>
+                    {p.status}
+                  </span>
                 </div>
                 <div className="flex items-center gap-3 text-[10px] text-zinc-500">
                   <div className="flex items-center gap-1">

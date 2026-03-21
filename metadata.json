@@ -1,5 +1,5 @@
 {
-  "name": "PotholePatrol AI",
+  "name": "RoadCore",
   "description": "Real-time pothole detection and mapping application using AI and GPS.",
   "requestFramePermissions": [
     "camera",

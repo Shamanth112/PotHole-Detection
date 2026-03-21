@@ -20,7 +20,10 @@ import {
   Settings,
   Building2,
   ShieldCheck,
-  ArrowLeft
+  ArrowLeft,
+  User as UserIcon,
+  History,
+  Scan
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import confetti from 'canvas-confetti';
@@ -29,7 +32,7 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [userRole, setUserRole] = useState<'user' | 'admin' | 'municipal' | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'dashcam' | 'map' | 'list'>('dashcam');
+  const [activeTab, setActiveTab] = useState<'map' | 'scan' | 'history' | 'profile'>('map');
   const { potholes } = usePotholes();
   const navigate = useNavigate();
   const location = useLocation();
@@ -50,14 +53,12 @@ export default function App() {
               role = 'admin';
             }
           } else {
-            // Check for pending municipal user by email
             const emailKey = user.email?.toLowerCase().trim() || '';
             const emailRef = doc(db, 'users', emailKey);
             const emailSnap = await getDoc(emailRef);
             
             if (emailSnap.exists() && emailSnap.data().role === 'municipal') {
               role = 'municipal';
-              // Migrate to UID-based record
               await setDoc(userRef, {
                 ...emailSnap.data(),
                 uid: user.uid,
@@ -84,7 +85,6 @@ export default function App() {
         }
       } catch (error: any) {
         console.error("Auth state change error:", error);
-        // If it's a permission error, it might be because the user was just deleted or rules changed
         if (error.code === 'permission-denied') {
           auth.signOut();
         }
@@ -131,7 +131,6 @@ export default function App() {
     );
   }
 
-  // Simplified view for Municipal users
   if (user && userRole === 'municipal') {
     return (
       <div className="min-h-screen bg-black">
@@ -141,7 +140,7 @@ export default function App() {
               <ShieldAlert className="w-5 h-5 text-white" />
             </div>
             <span className="font-black text-xl tracking-tighter uppercase italic">
-              Patrol<span className="text-blue-600">AI</span>
+              Road<span className="text-blue-600">Core</span>
             </span>
           </div>
           <div className="flex items-center gap-4">
@@ -190,7 +189,7 @@ export default function App() {
                 <ShieldAlert className="w-10 h-10 text-white" />
               </div>
               <h1 className="text-5xl font-black text-white mb-4 tracking-tighter uppercase italic">
-                Pothole<span className="text-red-600">Patrol</span> AI
+                Road<span className="text-red-600">Core</span>
               </h1>
               <p className="text-zinc-400 mb-12 text-lg">Real-time AI-powered dashcam for safer roads.</p>
               <div className="space-y-4">
@@ -206,89 +205,117 @@ export default function App() {
             </motion.div>
           </div>
         ) : (
-          <div className="min-h-screen bg-black text-zinc-100 font-sans">
+          <div className="min-h-screen bg-black text-zinc-100 font-sans flex flex-col">
+            {/* Mobile Header */}
             <header className="h-16 border-b border-zinc-800 bg-black/50 backdrop-blur-xl flex items-center justify-between px-6 sticky top-0 z-50">
               <div className="flex items-center gap-3">
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${userRole === 'municipal' ? 'bg-blue-600' : 'bg-red-600'}`}>
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-red-600">
                   <ShieldAlert className="w-5 h-5 text-white" />
                 </div>
                 <span className="font-black text-xl tracking-tighter uppercase italic">
-                  Patrol<span className={userRole === 'municipal' ? 'text-blue-600' : 'text-red-600'}>AI</span>
+                  Road<span className="text-red-600">Core</span>
                 </span>
               </div>
               <div className="flex items-center gap-4">
                 {userRole === 'admin' && (
                   <button onClick={() => navigate('/admin')} className="hidden sm:flex items-center gap-2 bg-emerald-600/20 text-emerald-500 px-3 py-1.5 rounded-full border border-emerald-500/30 text-[10px] font-bold uppercase">
-                    <ShieldCheck className="w-3 h-3" /> Admin Panel
+                    <ShieldCheck className="w-3 h-3" /> Admin
                   </button>
                 )}
-                <button onClick={handleLogout} className="p-2 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-white">
-                  <LogOut className="w-5 h-5" />
-                </button>
                 <img src={user.photoURL || `https://ui-avatars.com/api/?name=${user.email}`} className="w-8 h-8 rounded-full border border-zinc-700" alt="User" />
               </div>
             </header>
 
-            <main className="p-4 sm:p-6 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-4rem)]">
-              <div className="lg:col-span-8 flex flex-col gap-6 h-full">
-                <div className="flex-1 min-h-0">
-                  <AnimatePresence mode="wait">
-                    {activeTab === 'dashcam' && (
-                      <motion.div key="dashcam" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="h-full">
-                        <CameraView onDetection={handleDetection} />
-                      </motion.div>
-                    )}
-                    {activeTab === 'map' && (
-                      <motion.div key="map" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="h-full">
-                        <MapView potholes={potholes} />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-                <div className="bg-zinc-900/80 backdrop-blur-md p-2 rounded-2xl border border-zinc-800 flex items-center justify-around">
-                  <TabButton active={activeTab === 'dashcam'} onClick={() => setActiveTab('dashcam')} icon={<Camera className="w-5 h-5" />} label="Dashcam" />
-                  <TabButton active={activeTab === 'map'} onClick={() => setActiveTab('map')} icon={<MapIcon className="w-5 h-5" />} label="Map" />
-                  <TabButton active={activeTab === 'list'} onClick={() => setActiveTab('list')} icon={<LayoutDashboard className="w-5 h-5" />} label="Stats" />
-                </div>
-              </div>
-              <div className="lg:col-span-4 hidden lg:flex flex-col gap-6 h-full min-h-0">
-                <div className="flex-1 min-h-0">
-                  <PotholeList potholes={potholes} />
-                </div>
-                <div className="bg-zinc-900 p-5 rounded-2xl border border-zinc-800">
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="font-bold text-sm uppercase tracking-widest text-zinc-500">Session Stats</h4>
-                    <Settings className="w-4 h-4 text-zinc-700" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-black/40 p-3 rounded-xl border border-zinc-800/50">
-                      <span className="block text-[10px] text-zinc-500 uppercase font-bold mb-1">Detections</span>
-                      <span className={`text-2xl font-black ${userRole === 'municipal' ? 'text-blue-500' : 'text-red-500'}`}>{potholes.length}</span>
+            {/* Main Content Area */}
+            <main className="flex-1 relative overflow-hidden">
+              <AnimatePresence mode="wait">
+                {activeTab === 'map' && (
+                  <motion.div key="map" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0">
+                    <MapView potholes={potholes} />
+                  </motion.div>
+                )}
+                {activeTab === 'scan' && (
+                  <motion.div key="scan" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="absolute inset-0 z-10">
+                    <CameraView onDetection={handleDetection} />
+                  </motion.div>
+                )}
+                {activeTab === 'history' && (
+                  <motion.div key="history" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="absolute inset-0 bg-black p-4 overflow-y-auto">
+                    <div className="max-w-2xl mx-auto">
+                      <h2 className="text-2xl font-black uppercase italic mb-6">Detection History</h2>
+                      <PotholeList potholes={potholes} />
                     </div>
-                    <div className="bg-black/40 p-3 rounded-xl border border-zinc-800/50">
-                      <span className="block text-[10px] text-zinc-500 uppercase font-bold mb-1">Accuracy</span>
-                      <span className="text-2xl font-black text-emerald-500">94%</span>
+                  </motion.div>
+                )}
+                {activeTab === 'profile' && (
+                  <motion.div key="profile" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="absolute inset-0 bg-zinc-950 p-6 flex flex-col items-center overflow-y-auto">
+                    <div className="w-full max-w-sm flex flex-col items-center pt-12">
+                      <div className="relative mb-6">
+                        <img src={user.photoURL || `https://ui-avatars.com/api/?name=${user.email}`} className="w-24 h-24 rounded-full border-4 border-red-600 shadow-2xl" alt="Profile" />
+                        <div className="absolute -bottom-2 -right-2 bg-red-600 p-2 rounded-full shadow-lg">
+                          <ShieldCheck className="w-4 h-4 text-white" />
+                        </div>
+                      </div>
+                      <h3 className="text-2xl font-bold mb-1">{user.displayName || 'Road Guardian'}</h3>
+                      <p className="text-zinc-500 text-sm mb-8">{user.email}</p>
+                      
+                      <div className="grid grid-cols-2 gap-4 w-full mb-8">
+                        <div className="bg-zinc-900 p-4 rounded-2xl border border-zinc-800">
+                          <p className="text-[10px] font-bold text-zinc-500 uppercase mb-1">Reports</p>
+                          <p className="text-2xl font-black text-red-500">{potholes.filter(p => p.userId === user.uid).length}</p>
+                        </div>
+                        <div className="bg-zinc-900 p-4 rounded-2xl border border-zinc-800">
+                          <p className="text-[10px] font-bold text-zinc-500 uppercase mb-1">Points</p>
+                          <p className="text-2xl font-black text-emerald-500">{potholes.filter(p => p.userId === user.uid).length * 10}</p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3 w-full">
+                        <button className="w-full py-4 bg-zinc-900 rounded-2xl border border-zinc-800 flex items-center justify-between px-6 hover:bg-zinc-800 transition-all">
+                          <div className="flex items-center gap-3">
+                            <Settings className="w-5 h-5 text-zinc-400" />
+                            <span className="font-bold">Account Settings</span>
+                          </div>
+                          <ArrowLeft className="w-4 h-4 rotate-180 text-zinc-600" />
+                        </button>
+                        <button className="w-full py-4 bg-zinc-900 rounded-2xl border border-zinc-800 flex items-center justify-between px-6 hover:bg-zinc-800 transition-all">
+                          <div className="flex items-center gap-3">
+                            <Activity className="w-5 h-5 text-zinc-400" />
+                            <span className="font-bold">My Activity</span>
+                          </div>
+                          <ArrowLeft className="w-4 h-4 rotate-180 text-zinc-600" />
+                        </button>
+                        <button onClick={handleLogout} className="w-full py-4 bg-red-600/10 text-red-500 rounded-2xl border border-red-600/20 flex items-center justify-center gap-3 font-bold hover:bg-red-600/20 transition-all mt-4">
+                          <LogOut className="w-5 h-5" />
+                          Sign Out
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </main>
-            
-            <AnimatePresence>
-              {activeTab === 'list' && (
-                <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="fixed inset-0 z-[60] bg-black p-4 lg:hidden">
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-xl font-bold">Detection History</h2>
-                    <button onClick={() => setActiveTab('dashcam')} className="p-2 bg-zinc-800 rounded-full">
-                      <LogOut className="w-5 h-5 rotate-180" />
-                    </button>
-                  </div>
-                  <div className="h-[calc(100%-4rem)]">
-                    <PotholeList potholes={potholes} />
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+
+            {/* Bottom Navigation */}
+            <nav className="h-20 bg-black/80 backdrop-blur-2xl border-t border-zinc-800 px-6 flex items-center justify-between pb-2 z-50">
+              <NavButton active={activeTab === 'map'} onClick={() => setActiveTab('map')} icon={<MapIcon className="w-6 h-6" />} label="Map" />
+              <NavButton active={activeTab === 'history'} onClick={() => setActiveTab('history')} icon={<History className="w-6 h-6" />} label="History" />
+              
+              {/* Center Scan Button */}
+              <div className="relative -top-6">
+                <button 
+                  onClick={() => setActiveTab('scan')}
+                  className={`w-16 h-16 rounded-full flex items-center justify-center shadow-2xl transition-all duration-300 ${
+                    activeTab === 'scan' ? 'bg-white text-black scale-110' : 'bg-red-600 text-white hover:scale-105'
+                  }`}
+                >
+                  <Scan className="w-8 h-8" />
+                </button>
+              </div>
+
+              <NavButton active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} icon={<UserIcon className="w-6 h-6" />} label="Profile" />
+              <NavButton active={false} onClick={() => alert("More features coming soon!")} icon={<Settings className="w-6 h-6" />} label="More" />
+            </nav>
           </div>
         )
       } />
@@ -296,11 +323,12 @@ export default function App() {
   );
 }
 
-function TabButton({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string }) {
+function NavButton({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string }) {
   return (
-    <button onClick={onClick} className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all ${active ? 'bg-zinc-100 text-black shadow-lg' : 'text-zinc-500 hover:text-zinc-300'}`}>
+    <button onClick={onClick} className={`flex flex-col items-center gap-1 transition-all ${active ? 'text-red-500' : 'text-zinc-500 hover:text-zinc-300'}`}>
       {icon}
       <span className="text-[10px] font-bold uppercase tracking-tighter">{label}</span>
+      {active && <motion.div layoutId="nav-dot" className="w-1 h-1 bg-red-500 rounded-full mt-0.5" />}
     </button>
   );
 }

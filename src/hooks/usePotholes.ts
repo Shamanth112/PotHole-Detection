@@ -8,6 +8,7 @@ export interface Pothole {
   longitude: number;
   timestamp: any;
   severity: 'low' | 'medium' | 'high';
+  status: 'reported' | 'verified' | 'fixing' | 'resolved';
   imageUrl?: string;
   userId: string;
   userName?: string;

@@ -100,6 +100,7 @@ export default function CameraView({ onDetection }: CameraViewProps) {
           longitude,
           timestamp: serverTimestamp(),
           severity: detection.score > 0.8 ? 'high' : 'medium',
+          status: 'reported',
           userId: auth.currentUser?.uid,
           userName: auth.currentUser?.displayName || auth.currentUser?.email || 'Anonymous',
           class: detection.class
@@ -131,26 +132,41 @@ export default function CameraView({ onDetection }: CameraViewProps) {
         className="absolute inset-0 w-full h-full object-cover pointer-events-none"
       />
       
-      <div className="absolute top-4 left-4 z-10">
+      <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
         <div className="flex items-center gap-2 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20">
-          <div className={`w-2 h-2 rounded-full ${isModelLoading ? 'bg-yellow-500 animate-pulse' : 'bg-green-500'}`} />
-          <span className="text-xs font-medium text-white">
-            {isModelLoading ? 'AI Loading...' : 'AI Active'}
+          <div className={`w-2 h-2 rounded-full ${isModelLoading ? 'bg-yellow-500 animate-pulse' : 'bg-red-600 animate-pulse'}`} />
+          <span className="text-[10px] font-black uppercase tracking-widest text-white">
+            {isModelLoading ? 'AI Loading...' : 'REC'}
+          </span>
+        </div>
+        <div className="bg-black/40 backdrop-blur-md px-3 py-1 rounded-lg border border-white/10">
+          <span className="text-[10px] font-mono text-zinc-300">
+            {new Date().toLocaleTimeString()}
           </span>
         </div>
       </div>
 
       <AnimatePresence>
-        {detections.some(d => d.class === 'pothole') && (
+        {detections.some(d => d.class === 'pothole' && d.score > 0.6) && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="absolute bottom-24 left-1/2 -translate-x-1/2 z-20 w-full px-6"
           >
-            <div className="bg-red-600 text-white px-6 py-3 rounded-2xl shadow-xl flex items-center gap-3 border-2 border-red-400">
-              <AlertTriangle className="w-6 h-6 animate-bounce" />
-              <span className="font-bold text-lg uppercase tracking-wider">Pothole Detected!</span>
+            <div className="bg-red-600/90 backdrop-blur-xl text-white p-4 rounded-2xl shadow-2xl flex items-center justify-between border border-red-400/50">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                  <AlertTriangle className="w-6 h-6 text-white animate-pulse" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest opacity-70">Detection Alert</p>
+                  <p className="font-black text-xl italic uppercase tracking-tighter">Pothole Identified</p>
+                </div>
+              </div>
+              <div className="bg-white text-red-600 px-3 py-1 rounded-lg font-black text-sm">
+                {Math.round(detections.find(d => d.class === 'pothole')?.score || 0 * 100)}%
+              </div>
             </div>
           </motion.div>
         )}
