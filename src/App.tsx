@@ -210,7 +210,7 @@ export default function App() {
     );
   }
 
-  if (user && userRole === 'municipal') {
+  if (user && (userRole === 'municipal' || userRole === 'admin')) {
     return (
       <div className="min-h-screen bg-black">
         <header className="h-16 border-b border-zinc-800 bg-black/50 backdrop-blur-xl flex items-center justify-between px-6 sticky top-0 z-50">
@@ -223,6 +223,14 @@ export default function App() {
             </span>
           </div>
           <div className="flex items-center gap-4">
+            {userRole === 'admin' && (
+              <button 
+                onClick={() => navigate('/admin')}
+                className="text-xs font-bold text-zinc-400 hover:text-white flex items-center gap-2 bg-zinc-900 px-3 py-1.5 rounded-lg border border-zinc-800"
+              >
+                <ShieldCheck className="w-4 h-4 text-emerald-500" /> Admin Console
+              </button>
+            )}
             <button onClick={handleLogout} className="p-2 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-white">
               <LogOut className="w-5 h-5" />
             </button>
