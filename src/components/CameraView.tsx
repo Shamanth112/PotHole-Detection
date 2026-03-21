@@ -44,21 +44,24 @@ export default function CameraView({ onDetection, onBack, gpsActive }: CameraVie
 
   useEffect(() => {
     let animationFrameId: number;
+    const ROI_TOP_PERCENT = 0.45; // Focus on bottom 55% of the screen
 
     const render = async () => {
       if (videoRef.current && videoRef.current.readyState === 4 && !isModelLoading) {
         const results = await detectPotholes(videoRef.current);
-        setDetections(results);
+        const videoHeight = videoRef.current.videoHeight;
         
-        // Filter for potholes (mocked as 'pothole' in service)
-        // Focus on the road by only considering detections in the lower 60% of the screen
+        // Filter for potholes within the Road ROI
         const potholes = results.filter(d => {
           const isPothole = d.class === 'pothole' && d.score > 0.6;
           const [x, y, width, height] = d.bbox;
-          const videoHeight = videoRef.current?.videoHeight || 1;
-          const isOnRoad = (y + height / 2) > (videoHeight * 0.4); // Lower 60%
+          // Check if the center of the detection is in the lower part of the screen
+          const centerY = y + height / 2;
+          const isOnRoad = centerY > (videoHeight * ROI_TOP_PERCENT);
           return isPothole && isOnRoad;
         });
+        
+        setDetections(potholes);
         
         if (potholes.length > 0) {
           const now = Date.now();
@@ -68,7 +71,7 @@ export default function CameraView({ onDetection, onBack, gpsActive }: CameraVie
           }
         }
 
-        drawBoundingBoxes(results);
+        drawBoundingBoxes(results, videoHeight * ROI_TOP_PERCENT);
       }
       animationFrameId = requestAnimationFrame(render);
     };
@@ -80,21 +83,38 @@ export default function CameraView({ onDetection, onBack, gpsActive }: CameraVie
     return () => cancelAnimationFrame(animationFrameId);
   }, [isModelLoading]);
 
-  const drawBoundingBoxes = (detections: Detection[]) => {
+  const drawBoundingBoxes = (detections: Detection[], roiTop: number) => {
     const ctx = canvasRef.current?.getContext('2d');
     if (!ctx || !videoRef.current) return;
 
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
     
+    // Draw ROI boundary
+    ctx.setLineDash([5, 5]);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, roiTop);
+    ctx.lineTo(ctx.canvas.width, roiTop);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
     detections.forEach(d => {
       const [x, y, width, height] = d.bbox;
-      ctx.strokeStyle = d.class === 'pothole' ? '#ef4444' : '#3b82f6';
-      ctx.lineWidth = 4;
-      ctx.strokeRect(x, y, width, height);
+      const centerY = y + height / 2;
+      const isOnRoad = centerY > roiTop;
 
-      ctx.fillStyle = d.class === 'pothole' ? '#ef4444' : '#3b82f6';
-      ctx.font = '16px sans-serif';
-      ctx.fillText(`${d.class} (${Math.round(d.score * 100)}%)`, x, y > 10 ? y - 5 : 10);
+      if (d.class === 'pothole') {
+        ctx.strokeStyle = isOnRoad ? '#ef4444' : 'rgba(239, 68, 68, 0.3)';
+        ctx.lineWidth = isOnRoad ? 4 : 2;
+        ctx.strokeRect(x, y, width, height);
+
+        if (isOnRoad) {
+          ctx.fillStyle = '#ef4444';
+          ctx.font = 'bold 16px sans-serif';
+          ctx.fillText(`POTHOLE (${Math.round(d.score * 100)}%)`, x, y > 10 ? y - 5 : 10);
+        }
+      }
     });
   };
 
@@ -145,6 +165,18 @@ export default function CameraView({ onDetection, onBack, gpsActive }: CameraVie
         ref={canvasRef}
         className="absolute inset-0 w-full h-full object-cover pointer-events-none"
       />
+      
+      {/* Road Detection Zone Overlay */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="h-[45%] bg-black/40 backdrop-blur-[2px] border-b border-white/10 flex items-end justify-center pb-2">
+          <span className="text-[9px] font-bold text-white/40 uppercase tracking-[0.2em]">Sky/Surroundings Ignored</span>
+        </div>
+        <div className="h-[55%] bg-gradient-to-b from-blue-500/5 to-transparent relative">
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 px-3 py-1 bg-blue-500/20 rounded-full border border-blue-500/30">
+            <span className="text-[8px] font-black text-blue-400 uppercase tracking-widest">Road Detection Active</span>
+          </div>
+        </div>
+      </div>
       
       {/* Scanning Line */}
       <motion.div 

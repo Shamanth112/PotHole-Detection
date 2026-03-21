@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { collection, query, onSnapshot, orderBy, limit } from 'firebase/firestore';
-import { db } from '../firebase';
+import { auth, db } from '../firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 export interface Pothole {
   id: string;
@@ -19,8 +20,22 @@ export interface Pothole {
 export function usePotholes() {
   const [potholes, setPotholes] = useState<Pothole[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(!!auth.currentUser);
 
   useEffect(() => {
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      setIsAuthenticated(!!user);
+    });
+    return () => unsubscribeAuth();
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setPotholes([]);
+      setLoading(false);
+      return;
+    }
+
     const q = query(
       collection(db, 'potholes'),
       orderBy('timestamp', 'desc'),
@@ -35,12 +50,15 @@ export function usePotholes() {
       setPotholes(data);
       setLoading(false);
     }, (error) => {
-      console.error("Error fetching potholes:", error);
+      // Only log if it's not a permission error while logging out
+      if (error.code !== 'permission-denied') {
+        console.error("Error fetching potholes:", error);
+      }
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [isAuthenticated]);
 
   return { potholes, loading };
 }

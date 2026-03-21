@@ -50,7 +50,9 @@ service cloud.firestore {
     }
 
     function isMunicipal() {
-      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'municipal';
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'municipal';
     }
 
     function isValidPothole(data) {
@@ -101,7 +103,11 @@ service cloud.firestore {
     match /potholes/{potholeId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() && isValidPothole(request.resource.data) && request.resource.data.userId == request.auth.uid;
-      allow update: if isAdmin() || isMunicipal() || (isAuthenticated() && resource.data.userId == request.auth.uid && isValidPothole(request.resource.data));
+      allow update: if isAuthenticated() && (
+        isAdmin() || 
+        isMunicipal() || 
+        (resource.data.userId == request.auth.uid && isValidPothole(request.resource.data))
+      );
       allow delete: if isAdmin();
     }
 

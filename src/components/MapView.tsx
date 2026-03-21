@@ -132,6 +132,10 @@ export default function MapView({ potholes, onAddReport }: MapViewProps) {
                   </div>
                   <div className="space-y-1 text-xs text-zinc-600">
                     <div className="flex items-center gap-1.5">
+                      <User className="w-3 h-3" />
+                      <span className="font-medium">{selectedPothole.userName || 'Anonymous Reporter'}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
                       <Calendar className="w-3 h-3" />
                       <span>{new Date(selectedPothole.timestamp?.seconds * 1000).toLocaleString()}</span>
                     </div>
