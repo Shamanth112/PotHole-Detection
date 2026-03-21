@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { APIProvider, Map, AdvancedMarker, Pin, InfoWindow, useAdvancedMarkerRef } from '@vis.gl/react-google-maps';
-import { Pothole } from '../services/databaseService';
+import { Pothole } from '../hooks/usePotholes';
 import { MapPin, Calendar, User, Navigation, LocateFixed, Filter, Plus } from 'lucide-react';
 
 const API_KEY = process.env.GOOGLE_MAPS_PLATFORM_KEY || '';
@@ -137,7 +137,7 @@ export default function MapView({ potholes, onAddReport }: MapViewProps) {
                     </div>
                     <div className="flex items-center gap-1.5">
                       <Calendar className="w-3 h-3" />
-                      <span>{new Date(selectedPothole.timestamp).toLocaleString()}</span>
+                      <span>{new Date(selectedPothole.timestamp?.seconds * 1000).toLocaleString()}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <Navigation className="w-3 h-3" />

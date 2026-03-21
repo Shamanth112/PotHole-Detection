@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { auth } from '../firebase';
-import { dbService, Pothole, UserProfile, PermittedUser } from '../services/databaseService';
+import { db, auth } from '../firebase';
+import { collection, getDocs, doc, setDoc, deleteDoc, query, onSnapshot, orderBy, limit, Timestamp, addDoc } from 'firebase/firestore';
 import { 
   UserPlus, Users, ShieldCheck, Mail, Trash2, Loader2, 
   LayoutDashboard, MapPin, Plus, AlertTriangle, CheckCircle2, Clock, 
@@ -12,9 +12,9 @@ type AdminTab = 'stats' | 'users' | 'potholes' | 'permitted';
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<AdminTab>('stats');
-  const [users, setUsers] = useState<UserProfile[]>([]);
-  const [potholes, setPotholes] = useState<Pothole[]>([]);
-  const [permittedUsers, setPermittedUsers] = useState<PermittedUser[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [potholes, setPotholes] = useState<any[]>([]);
+  const [permittedUsers, setPermittedUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -36,35 +36,30 @@ export default function AdminDashboard() {
   useEffect(() => {
     fetchUsers();
     
-    // Initial fetch
-    const fetchData = async () => {
-      try {
-        const [potholesData, permittedData] = await Promise.all([
-          dbService.getPotholes(),
-          dbService.getAllPermittedUsers()
-        ]);
-        setPotholes(potholesData);
-        setPermittedUsers(permittedData);
-      } catch (err) {
-        console.error("Error fetching admin data:", err);
-      }
-    };
-    fetchData();
+    // Listen to potholes
+    const q = query(collection(db, 'potholes'), orderBy('timestamp', 'desc'), limit(100));
+    const unsubscribePotholes = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setPotholes(data);
+    });
 
-    // Listen to changes
-    const potholeSub = dbService.subscribeToPotholes(setPotholes);
-    const permittedSub = dbService.subscribeToPermittedUsers(setPermittedUsers);
+    // Listen to permitted users
+    const unsubscribePermitted = onSnapshot(collection(db, 'permitted_users'), (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setPermittedUsers(data);
+    });
 
     return () => {
-      potholeSub();
-      permittedSub();
+      unsubscribePotholes();
+      unsubscribePermitted();
     };
   }, []);
 
   const fetchUsers = async () => {
     try {
-      const usersList = await dbService.getAllUsers();
-      usersList.sort((a, b) => (a.email || '').localeCompare(b.email || ''));
+      const querySnapshot = await getDocs(collection(db, 'users'));
+      const usersList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      usersList.sort((a: any, b: any) => (a.email || '').localeCompare(b.email || ''));
       setUsers(usersList);
     } catch (err) {
       console.error("Error fetching users:", err);
@@ -79,79 +74,56 @@ export default function AdminDashboard() {
 
     try {
       const emailKey = newEmail.toLowerCase().trim();
-      await dbService.addPermittedUser({
+      await setDoc(doc(db, 'permitted_users', emailKey), {
         email: emailKey,
-        role: newRole
+        role: newRole,
+        addedAt: new Date().toISOString()
       });
 
       setNewEmail('');
       setSuccess(`Successfully added ${emailKey} as ${newRole}.`);
     } catch (err: any) {
-      console.error("Error adding permitted user:", err);
-      setError("Failed to add permitted user.");
+      setError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const [confirmModal, setConfirmModal] = useState<{
-    show: boolean;
-    title: string;
-    message: string;
-    onConfirm: () => void;
-  }>({ show: false, title: '', message: '', onConfirm: () => {} });
-
-  const handleDeletePermittedUser = (email: string) => {
-    setConfirmModal({
-      show: true,
-      title: 'Remove Permissions',
-      message: `Are you sure you want to remove permissions for ${email}?`,
-      onConfirm: async () => {
-        try {
-          await dbService.deletePermittedUser(email);
-          setSuccess(`Permissions removed for ${email}.`);
-        } catch (err: any) {
-          console.error("Error deleting permitted user:", err);
-          setError("Failed to remove permissions.");
-        }
-        setConfirmModal(prev => ({ ...prev, show: false }));
-      }
-    });
+  const handleDeletePermittedUser = async (email: string) => {
+    if (!window.confirm(`Remove permissions for ${email}?`)) return;
+    try {
+      await deleteDoc(doc(db, 'permitted_users', email));
+      setSuccess(`Permissions removed for ${email}.`);
+    } catch (err: any) {
+      setError(`Failed to remove permissions: ${err.message}`);
+    }
   };
 
-  const handleDeleteUser = (user: UserProfile) => {
-    setConfirmModal({
-      show: true,
-      title: 'Delete User',
-      message: `Are you sure you want to delete ${user.email} from registered users? This action cannot be undone.`,
-      onConfirm: async () => {
-        setDeletingId(user.uid);
-        try {
-          await dbService.deleteUser(user.uid);
-          setSuccess(`User ${user.email} deleted.`);
-          fetchUsers();
-        } catch (err: any) {
-          console.error("Error deleting user:", err);
-          setError("Failed to delete user.");
-        } finally {
-          setDeletingId(null);
-          setConfirmModal(prev => ({ ...prev, show: false }));
-        }
-      }
-    });
+  const handleDeleteUser = async (user: any) => {
+    if (!window.confirm(`Are you sure you want to delete ${user.email} from registered users?`)) return;
+    setDeletingId(user.id);
+    try {
+      await deleteDoc(doc(db, 'users', user.id));
+      setSuccess(`User ${user.email} deleted.`);
+      fetchUsers();
+    } catch (err: any) {
+      setError(`Failed to delete user: ${err.message}`);
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const handleAddPothole = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await dbService.addPothole({
+      await addDoc(collection(db, 'potholes'), {
         latitude: parseFloat(newPothole.latitude),
         longitude: parseFloat(newPothole.longitude),
         severity: newPothole.severity,
         address: newPothole.address || 'Manual Entry',
         status: 'reported',
-        timestamp: new Date().toISOString(),
+        timestamp: Timestamp.now(),
         userId: auth.currentUser?.uid || 'admin',
         userName: 'Admin Manual Entry'
       });
@@ -159,28 +131,20 @@ export default function AdminDashboard() {
       setNewPothole({ latitude: '', longitude: '', severity: 'medium', address: '' });
       setSuccess('Pothole manually added to system.');
     } catch (err: any) {
-      console.error("Error adding pothole:", err);
+      setError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDeletePothole = (id: string) => {
-    setConfirmModal({
-      show: true,
-      title: 'Delete Pothole Report',
-      message: 'Are you sure you want to delete this pothole report permanently?',
-      onConfirm: async () => {
-        try {
-          await dbService.deletePothole(id);
-          setSuccess('Pothole report removed.');
-        } catch (err: any) {
-          console.error("Error deleting pothole:", err);
-          setError("Failed to delete pothole report.");
-        }
-        setConfirmModal(prev => ({ ...prev, show: false }));
-      }
-    });
+  const handleDeletePothole = async (id: string) => {
+    if (!window.confirm('Delete this pothole report permanently?')) return;
+    try {
+      await deleteDoc(doc(db, 'potholes', id));
+      setSuccess('Pothole report removed.');
+    } catch (err: any) {
+      setError(err.message);
+    }
   };
 
   const stats = {
@@ -436,7 +400,7 @@ export default function AdminDashboard() {
                         <h4 className="text-sm font-bold text-white truncate">{p.address || 'Unknown Location'}</h4>
                         <div className="flex items-center gap-3 mt-1 text-[10px] font-bold text-zinc-500">
                           <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {p.latitude.toFixed(4)}, {p.longitude.toFixed(4)}</span>
-                          <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {new Date(p.timestamp).toLocaleString()}</span>
+                          <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {new Date(p.timestamp?.seconds * 1000).toLocaleString()}</span>
                           <span className={`px-2 py-0.5 rounded uppercase ${
                             p.status === 'resolved' ? 'bg-emerald-500/20 text-emerald-500' : 
                             p.status === 'fixing' ? 'bg-blue-500/20 text-blue-500' : 'bg-zinc-800 text-zinc-400'
@@ -544,36 +508,6 @@ export default function AdminDashboard() {
                   </button>
                 </div>
               </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-      {/* Confirmation Modal */}
-      <AnimatePresence>
-        {confirmModal.show && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8 max-w-md w-full shadow-2xl"
-            >
-              <h3 className="text-xl font-black uppercase italic mb-4">{confirmModal.title}</h3>
-              <p className="text-zinc-400 mb-8">{confirmModal.message}</p>
-              <div className="flex gap-4">
-                <button
-                  onClick={() => setConfirmModal(prev => ({ ...prev, show: false }))}
-                  className="flex-1 py-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl font-bold transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={confirmModal.onConfirm}
-                  className="flex-1 py-3 bg-red-600 hover:bg-red-500 rounded-xl font-bold transition-all"
-                >
-                  Confirm
-                </button>
-              </div>
             </motion.div>
           </div>
         )}

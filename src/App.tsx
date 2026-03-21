@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { auth } from './firebase';
+import { auth, db } from './firebase';
 import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, User, updateProfile } from 'firebase/auth';
+import { doc, setDoc, getDoc, collection, addDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import HomeView from './components/HomeView';
 import ReportView from './components/ReportView';
@@ -10,7 +11,6 @@ import PotholeList from './components/PotholeList';
 import MunicipalDashboard from './components/MunicipalDashboard';
 import AdminDashboard from './components/AdminDashboard';
 import { usePotholes } from './hooks/usePotholes';
-import { dbService } from './services/databaseService';
 import { 
   LayoutDashboard, 
   Map as MapIcon, 
@@ -74,38 +74,32 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       try {
         if (user) {
-          // Set user immediately so the UI can start rendering the logged-in state
-          setUser(user);
-          
+          const userRef = doc(db, 'users', user.uid);
+          const userSnap = await getDoc(userRef);
           let role: 'user' | 'admin' | 'municipal' = 'user';
-          const isDefaultAdmin = user.email?.toLowerCase() === "shamanth.p2007@gmail.com";
           
-          try {
-            // Check permitted_users table for assigned role
-            const permitted = await dbService.getPermittedUser(user.email || '');
-            
-            if (permitted) {
-              role = permitted.role;
-            } else if (isDefaultAdmin) {
-              role = 'admin';
-            }
-
-            // Sync with users table
-            await dbService.upsertUserProfile({
-              uid: user.uid,
-              displayName: user.displayName || undefined,
-              email: user.email || '',
-              photoURL: user.photoURL || undefined,
-              role: role
-            });
-          } catch (dbError) {
-            console.error("Database sync error:", dbError);
-            // Fallback to default admin if DB sync fails
-            if (isDefaultAdmin) {
-              role = 'admin';
-            }
+          const isDefaultAdmin = user.email === "shamanth.p2007@gmail.com";
+          
+          // Check permitted_users collection for assigned role
+          const permittedRef = doc(db, 'permitted_users', user.email?.toLowerCase().trim() || '');
+          const permittedSnap = await getDoc(permittedRef);
+          
+          if (permittedSnap.exists()) {
+            role = permittedSnap.data().role;
+          } else if (isDefaultAdmin) {
+            role = 'admin';
           }
 
+          // Sync with users collection
+          await setDoc(userRef, {
+            uid: user.uid,
+            displayName: user.displayName,
+            email: user.email,
+            photoURL: user.photoURL,
+            role: role
+          }, { merge: true });
+
+          setUser(user);
           setUserRole(role);
         } else {
           setUser(null);
@@ -123,7 +117,6 @@ export default function App() {
   const handleLogin = async () => {
     const provider = new GoogleAuthProvider();
     try {
-      // Use signInWithPopup for better iframe compatibility
       await signInWithPopup(auth, provider);
     } catch (error: any) {
       // Ignore common user-cancellation errors
@@ -137,11 +130,9 @@ export default function App() {
       console.error("Login failed:", error);
       
       if (error.code === 'auth/unauthorized-domain') {
-        alert("Domain not authorized! Please add this URL to the 'Authorized domains' list in the Firebase Console (Authentication > Settings > Authorized domains):\n\n" + window.location.hostname);
-      } else if (error.code === 'auth/operation-not-allowed') {
-        alert("Google Sign-In is not enabled! Please go to the Firebase Console > Authentication > Sign-in method and enable 'Google'.");
+        alert("Domain not authorized! Please add your Vercel URL to the 'Authorized domains' list in the Firebase Console (Authentication > Settings).");
       } else {
-        alert("Login failed: " + error.message + " (Code: " + error.code + ")");
+        alert("Login failed: " + error.message);
       }
     }
   };
@@ -159,14 +150,8 @@ export default function App() {
       const photoURL = await uploadPotholeImage(file, `profiles/${user.uid}_${Date.now()}.jpg`);
       await updateProfile(user, { photoURL });
       
-      // Update Supabase user profile
-      await dbService.upsertUserProfile({
-        uid: user.uid,
-        displayName: user.displayName || undefined,
-        email: user.email || '',
-        photoURL: photoURL,
-        role: userRole || 'user'
-      });
+      // Update Firestore user doc as well
+      await updateDoc(doc(db, 'users', user.uid), { photoURL });
       
       // Force refresh user state
       const updatedUser = auth.currentUser;
@@ -179,16 +164,15 @@ export default function App() {
     }
   };
 
-  const handleReportPothole = async (data: { latitude: number; longitude: number; severity: string; address?: string; reportImageUrl?: string; notes?: string }, isAuto = false) => {
+  const handleReportPothole = async (data: { latitude: number; longitude: number; severity: string; address?: string; reportImageUrl?: string }, isAuto = false) => {
     if (!user) return;
     try {
-      await dbService.addPothole({
+      await addDoc(collection(db, 'potholes'), {
         ...data,
-        severity: data.severity as any,
         userId: user.uid,
         userName: user.displayName || 'Road Guardian',
         status: 'reported',
-        timestamp: new Date().toISOString(),
+        timestamp: serverTimestamp(),
       });
       
       if (!isAuto) {
@@ -202,7 +186,6 @@ export default function App() {
       }
     } catch (error) {
       console.error("Error reporting pothole:", error);
-      alert("Failed to report pothole.");
     }
   };
 
@@ -221,17 +204,32 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen bg-black gap-6">
+      <div className="flex items-center justify-center h-screen bg-black">
         <div className="w-16 h-16 border-4 border-red-500/20 border-t-red-500 rounded-full animate-spin" />
-        <div className="text-center space-y-2">
-          <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">Initializing RoadGuard...</p>
-          <button 
-            onClick={() => window.location.reload()}
-            className="text-[10px] text-zinc-600 hover:text-zinc-400 underline uppercase tracking-tighter"
-          >
-            Taking too long? Click to refresh
-          </button>
-        </div>
+      </div>
+    );
+  }
+
+  if (user && userRole === 'municipal') {
+    return (
+      <div className="min-h-screen bg-black">
+        <header className="h-16 border-b border-zinc-800 bg-black/50 backdrop-blur-xl flex items-center justify-between px-6 sticky top-0 z-50">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-blue-600">
+              <ShieldAlert className="w-5 h-5 text-white" />
+            </div>
+            <span className="font-black text-xl tracking-tighter uppercase italic">
+              Pothole<span className="text-blue-600">Detection</span> IDP
+            </span>
+          </div>
+          <div className="flex items-center gap-4">
+            <button onClick={handleLogout} className="p-2 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-white">
+              <LogOut className="w-5 h-5" />
+            </button>
+            <img src={user.photoURL || `https://ui-avatars.com/api/?name=${user.email}`} className="w-8 h-8 rounded-full border border-zinc-700" alt="User" />
+          </div>
+        </header>
+        <MunicipalDashboard potholes={potholes} />
       </div>
     );
   }
@@ -253,23 +251,6 @@ export default function App() {
             <div className="p-6">
               <AdminDashboard />
             </div>
-          </div>
-        ) : <Navigate to="/" />
-      } />
-
-      <Route path="/municipal" element={
-        user && (userRole === 'municipal' || userRole === 'admin') ? (
-          <div className="min-h-screen bg-black text-white">
-            <header className="h-16 border-b border-zinc-800 bg-black/50 backdrop-blur-xl flex items-center justify-between px-6 sticky top-0 z-50">
-              <div className="flex items-center gap-3">
-                <ShieldAlert className="w-6 h-6 text-blue-500" />
-                <span className="font-black text-xl tracking-tighter uppercase italic">Municipal Dashboard</span>
-              </div>
-              <button onClick={() => navigate('/')} className="text-zinc-400 hover:text-white flex items-center gap-2 text-sm">
-                <ArrowLeft className="w-4 h-4" /> Back to App
-              </button>
-            </header>
-            <MunicipalDashboard potholes={potholes} />
           </div>
         ) : <Navigate to="/" />
       } />
@@ -300,24 +281,11 @@ export default function App() {
                   <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="Google" />
                   Continue with Google
                 </button>
-                
-                <div className="pt-4 space-y-2">
-                  <p className="text-[10px] text-white/40 font-medium">
-                    Trouble logging in? Make sure third-party cookies are enabled or try opening the app in a new tab.
-                  </p>
-                  <button 
-                    onClick={() => window.location.reload()}
-                    className="text-[10px] text-white/60 hover:text-white underline uppercase tracking-tighter"
-                  >
-                    Refresh Status
-                  </button>
-                </div>
               </div>
 
               <p className="text-[10px] text-white/40 font-medium pt-12">
                 By continuing, you agree to our Terms & Privacy Policy
               </p>
-
             </motion.div>
           </div>
         ) : (
@@ -362,14 +330,6 @@ export default function App() {
                   icon={<UserIcon className="w-5 h-5" />} 
                   label="My Profile" 
                 />
-                {(userRole === 'municipal' || userRole === 'admin') && (
-                  <SidebarButton 
-                    active={false} 
-                    onClick={() => navigate('/municipal')} 
-                    icon={<ShieldAlert className="w-5 h-5 text-blue-400" />} 
-                    label="Municipal Dashboard" 
-                  />
-                )}
                 {userRole === 'admin' && (
                   <SidebarButton 
                     active={false} 
@@ -415,13 +375,12 @@ export default function App() {
                     className="h-full"
                   >
                     <HomeView 
-                      userRole={userRole}
                       onStartDetection={() => setActiveTab('scan')}
                       onReportManually={() => setActiveTab('report')}
                       stats={{
                         detectedToday: potholes.filter(p => {
                           const today = new Date();
-                          const pDate = new Date(p.timestamp);
+                          const pDate = new Date(p.timestamp?.seconds * 1000);
                           return pDate.toDateString() === today.toDateString();
                         }).length,
                         fixedThisWeek: potholes.filter(p => p.status === 'resolved').length
@@ -519,21 +478,9 @@ export default function App() {
                         <div>
                           <h2 className="text-xl font-bold">{user.displayName || 'Road Guardian'}</h2>
                           <p className="text-blue-100/60 text-xs font-medium">{user.email}</p>
-                          <div className="mt-2 flex items-center gap-2">
-                            <div className="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
-                              <Award className="w-3 h-3" />
-                              Elite Reporter
-                            </div>
-                            {userRole && (
-                              <div className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1 border ${
-                                userRole === 'admin' ? 'bg-purple-500/20 text-purple-400 border-purple-500/30' :
-                                userRole === 'municipal' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' :
-                                'bg-zinc-500/20 text-zinc-400 border-zinc-500/30'
-                              }`}>
-                                <ShieldCheck className="w-3 h-3" />
-                                {userRole}
-                              </div>
-                            )}
+                          <div className="mt-2 flex items-center gap-2 bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider">
+                            <Award className="w-3 h-3" />
+                            Elite Reporter
                           </div>
                         </div>
                       </div>
@@ -559,18 +506,6 @@ export default function App() {
                           <ProfileMenuItem icon={<Bell className="w-5 h-5" />} label="Notifications" />
                           <ProfileMenuItem icon={<Shield className="w-5 h-5" />} label="Privacy & Security" />
                           <ProfileMenuItem icon={<Award className="w-5 h-5" />} label="My Achievements" />
-                          {(userRole === 'municipal' || userRole === 'admin') && (
-                            <button 
-                              onClick={() => navigate('/municipal')}
-                              className="w-full flex items-center justify-between p-4 bg-blue-50 text-blue-600 rounded-2xl font-bold hover:bg-blue-100 transition-all"
-                            >
-                              <div className="flex items-center gap-3">
-                                <ShieldAlert className="w-5 h-5" />
-                                <span>Municipal Dashboard</span>
-                              </div>
-                              <ChevronRight className="w-4 h-4 opacity-50" />
-                            </button>
-                          )}
                           {userRole === 'admin' && (
                             <button 
                               onClick={() => navigate('/admin')}

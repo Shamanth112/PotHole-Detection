@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pothole } from '../services/databaseService';
+import { Pothole } from '../hooks/usePotholes';
 import { MapPin, Clock, ChevronRight, AlertTriangle, Info } from 'lucide-react';
 import { motion } from 'motion/react';
 
@@ -48,7 +48,7 @@ export default function PotholeList({ potholes }: PotholeListProps) {
                     </span>
                     <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#a0aec0] uppercase tracking-widest">
                       <Clock className="w-3 h-3" />
-                      <span>{new Date(p.timestamp).toLocaleDateString()}</span>
+                      <span>{new Date(p.timestamp?.seconds * 1000).toLocaleDateString()}</span>
                     </div>
                   </div>
                 </div>

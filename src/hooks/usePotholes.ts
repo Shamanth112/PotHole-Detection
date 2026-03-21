@@ -1,7 +1,21 @@
 import { useState, useEffect } from 'react';
-import { auth } from '../firebase';
+import { collection, query, onSnapshot, orderBy, limit, where, doc, getDoc } from 'firebase/firestore';
+import { auth, db } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { dbService, Pothole } from '../services/databaseService';
+
+export interface Pothole {
+  id: string;
+  latitude: number;
+  longitude: number;
+  timestamp: any;
+  severity: 'low' | 'medium' | 'high';
+  status: 'reported' | 'verified' | 'fixing' | 'resolved';
+  reportImageUrl?: string;
+  resolvedImageUrl?: string;
+  userId: string;
+  userName?: string;
+  address?: string;
+}
 
 export function usePotholes() {
   const [potholes, setPotholes] = useState<Pothole[]>([]);
@@ -14,13 +28,11 @@ export function usePotholes() {
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        try {
-          const profile = await dbService.getUserProfile(user.uid);
-          setUserState({ uid: user.uid, role: profile?.role || 'user' });
-        } catch (error) {
-          console.error("Error fetching user profile:", error);
-          setUserState({ uid: user.uid, role: 'user' });
-        }
+        // Fetch role to determine query
+        const userRef = doc(db, 'users', user.uid);
+        const userSnap = await getDoc(userRef);
+        const role = userSnap.exists() ? userSnap.data().role : 'user';
+        setUserState({ uid: user.uid, role });
       } else {
         setUserState({ uid: null, role: null });
       }
@@ -35,36 +47,41 @@ export function usePotholes() {
       return;
     }
 
-    const fetchPotholes = async () => {
-      try {
-        let data;
-        if (userState.role === 'admin' || userState.role === 'municipal') {
-          data = await dbService.getPotholes();
-        } else {
-          data = await dbService.getPotholesByUser(userState.uid!);
-        }
-        setPotholes(data);
-      } catch (error) {
+    let q;
+    // Admins and Municipal users can see all reports
+    if (userState.role === 'admin' || userState.role === 'municipal') {
+      q = query(
+        collection(db, 'potholes'),
+        orderBy('timestamp', 'desc'),
+        limit(50)
+      );
+    } else {
+      // Regular users only see their own reports
+      // Note: This requires a composite index in Firestore for (userId ASC, timestamp DESC)
+      q = query(
+        collection(db, 'potholes'),
+        where('userId', '==', userState.uid),
+        orderBy('timestamp', 'desc'),
+        limit(50)
+      );
+    }
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Pothole[];
+      setPotholes(data);
+      setLoading(false);
+    }, (error) => {
+      // Only log if it's not a permission error while logging out
+      if (error.code !== 'permission-denied') {
         console.error("Error fetching potholes:", error);
-      } finally {
-        setLoading(false);
       }
-    };
-
-    fetchPotholes();
-
-    // Subscribe to changes
-    const subscription = dbService.subscribeToPotholes((updatedPotholes) => {
-      if (userState.role === 'admin' || userState.role === 'municipal') {
-        setPotholes(updatedPotholes);
-      } else {
-        setPotholes(updatedPotholes.filter(p => p.userId === userState.uid));
-      }
+      setLoading(false);
     });
 
-    return () => {
-      subscription();
-    };
+    return () => unsubscribe();
   }, [userState]);
 
   return { potholes, loading };

@@ -1,7 +1,8 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { loadModel, detectPotholes, Detection } from '../services/detectionService';
-import { auth } from '../firebase';
-import { Camera, AlertTriangle, ShieldCheck, ArrowLeft } from 'lucide-react';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { db, auth } from '../firebase';
+import { Camera, AlertTriangle, ShieldCheck, ArrowLeft, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { uploadPotholeImageFromBlob } from '../services/storageService';
 

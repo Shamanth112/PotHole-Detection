@@ -1,41 +1,35 @@
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: potholes
+// Document ID: auto-generated
+// Fields:
+//   - latitude: number (required) - GPS latitude
+//   - longitude: number (required) - GPS longitude
+//   - timestamp: timestamp (required) - When the pothole was detected
+//   - severity: string (optional) - low, medium, high
+//   - reportImageUrl: string (optional) - URL to the reporter's image
+//   - resolvedImageUrl: string (optional) - URL to the resolution image
+//   - userId: string (required) - UID of the user who detected it
+//   - userName: string (optional) - Name of the user
+//   - address: string (optional) - Reverse geocoded address
+//   - status: string (optional) - reported, verified, fixing, resolved
+//
+// Collection: users
+// Document ID: userId (UID)
+// Fields:
+//   - uid: string (required)
+//   - displayName: string (optional)
+//   - email: string (required)
+//   - photoURL: string (optional)
+//   - role: string (required) - user, admin
+//
+// ===============================================================
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // ===============================================================
-    // Assumed Data Model
-    // ===============================================================
-    //
-    // Collection: potholes
-    // Document ID: auto-generated
-    // Fields:
-    //   - latitude: number (required)
-    //   - longitude: number (required)
-    //   - timestamp: string (required, ISO 8601)
-    //   - severity: string (optional, low|medium|high)
-    //   - reportImageUrl: string (optional, URL)
-    //   - resolvedImageUrl: string (optional, URL)
-    //   - userId: string (required, UID)
-    //   - userName: string (optional)
-    //   - address: string (optional)
-    //   - status: string (optional, reported|verified|fixing|resolved)
-    //   - notes: string (optional)
-    //
-    // Collection: users
-    // Document ID: {uid}
-    // Fields:
-    //   - uid: string (required, UID)
-    //   - displayName: string (optional)
-    //   - email: string (required, email)
-    //   - photoURL: string (optional, URL)
-    //   - role: string (required, user|admin|municipal)
-    //
-    // Collection: permitted_users
-    // Document ID: {email}
-    // Fields:
-    //   - email: string (required, email)
-    //   - role: string (required, user|admin|municipal)
-    //
-    // ===============================================================
 
     // ===============================================================
     // Helper Functions
@@ -44,87 +38,86 @@ service cloud.firestore {
     function isAuthenticated() {
       return request.auth != null;
     }
-
+    
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
-
+    
     function isAdmin() {
-      return isAuthenticated() && (
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-        (request.auth.token.email == "shamanth.p2007@gmail.com" && request.auth.token.email_verified == true)
-      );
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "shamanth.p2007@gmail.com" && request.auth.token.email_verified == true));
     }
 
     function isMunicipal() {
-      return isAuthenticated() && (
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'municipal' ||
-        isAdmin()
-      );
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'municipal';
     }
-
-    function isValidEmail(email) {
-      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
-    }
-
-    function isValidUrl(url) {
-      return url is string && (url.matches("^https://.*") || url.matches("^http://.*"));
-    }
-
-    // ===============================================================
-    // Domain Validators
-    // ===============================================================
 
     function isValidPothole(data) {
       return data.keys().hasAll(['latitude', 'longitude', 'timestamp', 'userId']) &&
              data.latitude is number &&
              data.longitude is number &&
-             data.timestamp is string &&
-             data.userId is string &&
+             data.timestamp is timestamp &&
              (!('severity' in data) || data.severity in ['low', 'medium', 'high']) &&
-             (!('status' in data) || data.status in ['reported', 'verified', 'fixing', 'resolved']) &&
-             (!('reportImageUrl' in data) || isValidUrl(data.reportImageUrl)) &&
-             (!('resolvedImageUrl' in data) || isValidUrl(data.resolvedImageUrl));
+             (!('reportImageUrl' in data) || (data.reportImageUrl is string && data.reportImageUrl.size() < 2048)) &&
+             (!('resolvedImageUrl' in data) || (data.resolvedImageUrl is string && data.resolvedImageUrl.size() < 2048)) &&
+             (!('address' in data) || (data.address is string && data.address.size() < 500)) &&
+             (!('status' in data) || data.status in ['reported', 'verified', 'fixing', 'resolved']);
     }
 
     function isValidUser(data) {
       return data.keys().hasAll(['uid', 'email', 'role']) &&
              data.uid is string &&
-             isValidEmail(data.email) &&
-             data.role in ['user', 'admin', 'municipal'] &&
-             (!('photoURL' in data) || isValidUrl(data.photoURL));
-    }
-
-    function isValidPermittedUser(data) {
-      return data.keys().hasAll(['email', 'role']) &&
-             isValidEmail(data.email) &&
+             data.email is string &&
              data.role in ['user', 'admin', 'municipal'];
     }
 
     // ===============================================================
-    // Collection Rules
+    // Rules
     // ===============================================================
 
-    match /potholes/{potholeId} {
+    match /users/{userId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && isValidPothole(request.resource.data) && request.resource.data.userId == request.auth.uid;
-      allow update: if isAuthenticated() && (
-        (isOwner(resource.data.userId) && isValidPothole(request.resource.data) && request.resource.data.userId == resource.data.userId) ||
-        isMunicipal()
+      // Allow creation if:
+      // 1. Admin is creating it
+      // 2. User is creating their own profile
+      allow create: if isAdmin() || isOwner(userId);
+      
+      // Allow update if:
+      // 1. Admin is updating it
+      // 2. User is updating their own profile (role must match existing OR match permitted_users)
+      allow update: if isAdmin() || (
+        isOwner(userId) && (
+          request.resource.data.role == resource.data.role ||
+          (
+            exists(/databases/$(database)/documents/permitted_users/$(request.auth.token.email.toLower())) &&
+            request.resource.data.role == get(/databases/$(database)/documents/permitted_users/$(request.auth.token.email.toLower())).data.role
+          )
+        )
       );
       allow delete: if isAdmin();
     }
 
-    match /users/{uid} {
-      allow read: if isAuthenticated();
-      allow create: if isOwner(uid) && isValidUser(request.resource.data) && request.resource.data.role == 'user';
-      allow update: if (isOwner(uid) && isValidUser(request.resource.data) && request.resource.data.role == resource.data.role) || isAdmin();
+    match /potholes/{potholeId} {
+      allow read: if isAuthenticated() && (
+        isAdmin() || 
+        isMunicipal() || 
+        resource.data.userId == request.auth.uid
+      );
+      allow create: if isAuthenticated() && isValidPothole(request.resource.data) && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && (
+        isAdmin() || 
+        isMunicipal() || 
+        (resource.data.userId == request.auth.uid && isValidPothole(request.resource.data))
+      );
       allow delete: if isAdmin();
     }
 
     match /permitted_users/{email} {
       allow read: if isAuthenticated();
-      allow write: if isAdmin() && isValidPermittedUser(request.resource.data);
+      allow write: if isAdmin();
     }
   }
 }
