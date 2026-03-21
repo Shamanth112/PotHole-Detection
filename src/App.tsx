@@ -140,7 +140,7 @@ export default function App() {
               <ShieldAlert className="w-5 h-5 text-white" />
             </div>
             <span className="font-black text-xl tracking-tighter uppercase italic">
-              Road<span className="text-blue-600">Core</span>
+              Pothole<span className="text-blue-600">Detection</span> IDP
             </span>
           </div>
           <div className="flex items-center gap-4">
@@ -189,7 +189,7 @@ export default function App() {
                 <ShieldAlert className="w-10 h-10 text-white" />
               </div>
               <h1 className="text-5xl font-black text-white mb-4 tracking-tighter uppercase italic">
-                Road<span className="text-red-600">Core</span>
+                Pothole<span className="text-red-600">Detection</span> IDP
               </h1>
               <p className="text-zinc-400 mb-12 text-lg">Real-time AI-powered dashcam for safer roads.</p>
               <div className="space-y-4">
@@ -213,7 +213,7 @@ export default function App() {
                   <ShieldAlert className="w-5 h-5 text-white" />
                 </div>
                 <span className="font-black text-xl tracking-tighter uppercase italic">
-                  Road<span className="text-red-600">Core</span>
+                  Pothole<span className="text-red-600">Detection</span> IDP
                 </span>
               </div>
               <div className="flex items-center gap-4">

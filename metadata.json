@@ -1,5 +1,5 @@
 {
-  "name": "RoadCore",
+  "name": "Pothole Detection IDP",
   "description": "Real-time pothole detection and mapping application using AI and GPS.",
   "requestFramePermissions": [
     "camera",

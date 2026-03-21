@@ -34,7 +34,7 @@ export default function MunicipalDashboard({ potholes }: MunicipalDashboardProps
             </div>
             <div>
               <h1 className="text-3xl font-black tracking-tighter uppercase italic">
-                Road<span className="text-blue-600">Core</span> Municipal
+                Pothole<span className="text-blue-600">Detection</span> IDP
               </h1>
               <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">Pothole Detection Feed</p>
             </div>
