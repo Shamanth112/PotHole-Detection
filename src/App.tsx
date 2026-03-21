@@ -233,38 +233,6 @@ export default function App() {
     );
   }
 
-  if (user && (userRole === 'municipal' || userRole === 'admin')) {
-    return (
-      <div className="min-h-screen bg-black">
-        <header className="h-16 border-b border-zinc-800 bg-black/50 backdrop-blur-xl flex items-center justify-between px-6 sticky top-0 z-50">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-blue-600">
-              <ShieldAlert className="w-5 h-5 text-white" />
-            </div>
-            <span className="font-black text-xl tracking-tighter uppercase italic">
-              Pothole<span className="text-blue-600">Detection</span> IDP
-            </span>
-          </div>
-          <div className="flex items-center gap-4">
-            {userRole === 'admin' && (
-              <button 
-                onClick={() => navigate('/admin')}
-                className="text-xs font-bold text-zinc-400 hover:text-white flex items-center gap-2 bg-zinc-900 px-3 py-1.5 rounded-lg border border-zinc-800"
-              >
-                <ShieldCheck className="w-4 h-4 text-emerald-500" /> Admin Console
-              </button>
-            )}
-            <button onClick={handleLogout} className="p-2 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-white">
-              <LogOut className="w-5 h-5" />
-            </button>
-            <img src={user.photoURL || `https://ui-avatars.com/api/?name=${user.email}`} className="w-8 h-8 rounded-full border border-zinc-700" alt="User" />
-          </div>
-        </header>
-        <MunicipalDashboard potholes={potholes} />
-      </div>
-    );
-  }
-
   return (
     <Routes>
       <Route path="/admin" element={
@@ -282,6 +250,23 @@ export default function App() {
             <div className="p-6">
               <AdminDashboard />
             </div>
+          </div>
+        ) : <Navigate to="/" />
+      } />
+
+      <Route path="/municipal" element={
+        user && (userRole === 'municipal' || userRole === 'admin') ? (
+          <div className="min-h-screen bg-black text-white">
+            <header className="h-16 border-b border-zinc-800 bg-black/50 backdrop-blur-xl flex items-center justify-between px-6 sticky top-0 z-50">
+              <div className="flex items-center gap-3">
+                <ShieldAlert className="w-6 h-6 text-blue-500" />
+                <span className="font-black text-xl tracking-tighter uppercase italic">Municipal Dashboard</span>
+              </div>
+              <button onClick={() => navigate('/')} className="text-zinc-400 hover:text-white flex items-center gap-2 text-sm">
+                <ArrowLeft className="w-4 h-4" /> Back to App
+              </button>
+            </header>
+            <MunicipalDashboard potholes={potholes} />
           </div>
         ) : <Navigate to="/" />
       } />
@@ -374,6 +359,14 @@ export default function App() {
                   icon={<UserIcon className="w-5 h-5" />} 
                   label="My Profile" 
                 />
+                {(userRole === 'municipal' || userRole === 'admin') && (
+                  <SidebarButton 
+                    active={false} 
+                    onClick={() => navigate('/municipal')} 
+                    icon={<ShieldAlert className="w-5 h-5 text-blue-400" />} 
+                    label="Municipal Dashboard" 
+                  />
+                )}
                 {userRole === 'admin' && (
                   <SidebarButton 
                     active={false} 
@@ -419,6 +412,7 @@ export default function App() {
                     className="h-full"
                   >
                     <HomeView 
+                      userRole={userRole}
                       onStartDetection={() => setActiveTab('scan')}
                       onReportManually={() => setActiveTab('report')}
                       stats={{
@@ -550,6 +544,18 @@ export default function App() {
                           <ProfileMenuItem icon={<Bell className="w-5 h-5" />} label="Notifications" />
                           <ProfileMenuItem icon={<Shield className="w-5 h-5" />} label="Privacy & Security" />
                           <ProfileMenuItem icon={<Award className="w-5 h-5" />} label="My Achievements" />
+                          {(userRole === 'municipal' || userRole === 'admin') && (
+                            <button 
+                              onClick={() => navigate('/municipal')}
+                              className="w-full flex items-center justify-between p-4 bg-blue-50 text-blue-600 rounded-2xl font-bold hover:bg-blue-100 transition-all"
+                            >
+                              <div className="flex items-center gap-3">
+                                <ShieldAlert className="w-5 h-5" />
+                                <span>Municipal Dashboard</span>
+                              </div>
+                              <ChevronRight className="w-4 h-4 opacity-50" />
+                            </button>
+                          )}
                           {userRole === 'admin' && (
                             <button 
                               onClick={() => navigate('/admin')}
