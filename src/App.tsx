@@ -305,8 +305,6 @@ export default function App() {
                   <p>Project ID: {auth.app.options.projectId}</p>
                   <p>Auth Domain: {auth.app.options.authDomain}</p>
                   <p>Current Domain: {window.location.hostname}</p>
-                  <p>Supabase URL: {import.meta.env.VITE_SUPABASE_URL ? 'Configured' : 'MISSING'}</p>
-                  <p>Supabase Key: {import.meta.env.VITE_SUPABASE_ANON_KEY ? 'Configured' : 'MISSING'}</p>
                 </div>
               </div>
             </motion.div>
