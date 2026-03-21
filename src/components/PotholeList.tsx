@@ -43,21 +43,17 @@ export default function PotholeList({ potholes }: PotholeListProps) {
                   <span className="font-bold text-zinc-100 text-sm truncate">
                     {p.address || `Pothole at ${p.latitude.toFixed(4)}, ${p.longitude.toFixed(4)}`}
                   </span>
-                  <span className={`text-[10px] font-black uppercase px-1.5 py-0.5 rounded ${
-                    p.severity === 'high' ? 'bg-red-500 text-white' : 
-                    p.severity === 'medium' ? 'bg-orange-500 text-white' : 'bg-yellow-500 text-black'
-                  }`}>
-                    {p.severity}
-                  </span>
-                  <span className={`text-[10px] font-black uppercase px-1.5 py-0.5 rounded ml-2 ${
-                    p.status === 'resolved' ? 'bg-emerald-500 text-white' : 
-                    p.status === 'fixing' ? 'bg-blue-500 text-white' : 
-                    p.status === 'verified' ? 'bg-purple-500 text-white' : 'bg-zinc-700 text-white'
-                  }`}>
-                    {p.status}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[10px] font-black uppercase px-1.5 py-0.5 rounded ${
+                      p.severity === 'high' ? 'bg-red-500 text-white' : 
+                      p.severity === 'medium' ? 'bg-orange-500 text-white' : 'bg-yellow-500 text-black'
+                    }`}>
+                      {p.severity}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3 text-[10px] text-zinc-500">
+                
+                <div className="flex items-center gap-3 text-[10px] text-zinc-500 mb-2">
                   <div className="flex items-center gap-1">
                     <Clock className="w-3 h-3" />
                     <span>{new Date(p.timestamp?.seconds * 1000).toLocaleTimeString()}</span>
@@ -65,6 +61,23 @@ export default function PotholeList({ potholes }: PotholeListProps) {
                   <div className="flex items-center gap-1">
                     <User className="w-3 h-3" />
                     <span>{p.userName || 'Anonymous'}</span>
+                  </div>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="space-y-1.5">
+                  <div className="flex justify-between items-center text-[8px] font-black uppercase tracking-widest text-zinc-600">
+                    <span>Status: {p.status}</span>
+                    <span>{p.status === 'resolved' ? '100%' : p.status === 'fixing' ? '66%' : p.status === 'verified' ? '33%' : '10%'}</span>
+                  </div>
+                  <div className="h-1 w-full bg-zinc-800 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full transition-all duration-500 ${
+                        p.status === 'resolved' ? 'bg-emerald-500 w-full' : 
+                        p.status === 'fixing' ? 'bg-blue-500 w-2/3' : 
+                        p.status === 'verified' ? 'bg-purple-500 w-1/3' : 'bg-zinc-600 w-[10%]'
+                      }`}
+                    />
                   </div>
                 </div>
               </div>

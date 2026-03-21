@@ -242,8 +242,8 @@ export default function App() {
                 {activeTab === 'history' && (
                   <motion.div key="history" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="absolute inset-0 bg-black p-4 overflow-y-auto">
                     <div className="max-w-2xl mx-auto">
-                      <h2 className="text-2xl font-black uppercase italic mb-6">Detection History</h2>
-                      <PotholeList potholes={potholes} />
+                      <h2 className="text-2xl font-black uppercase italic mb-6">My Reports</h2>
+                      <PotholeList potholes={potholes.filter(p => p.userId === user.uid)} />
                     </div>
                   </motion.div>
                 )}
