@@ -2,10 +2,8 @@ import React, { useState, useRef } from 'react';
 import { Pothole } from '../hooks/usePotholes';
 import { MapPin, User, Navigation, Clock, ShieldAlert, CheckCircle2, Loader2, AlertCircle, Camera, Image as ImageIcon, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db, auth } from '../firebase';
+import { supabase } from '../supabase';
 import { uploadPotholeImage } from '../services/storageService';
-import { handleFirestoreError, OperationType } from '../utils/errorHandlers';
 
 interface MunicipalDashboardProps {
   potholes: Pothole[];
@@ -46,17 +44,18 @@ export default function MunicipalDashboard({ potholes }: MunicipalDashboardProps
         resolvedImageUrl = await uploadPotholeImage(selectedFile, `resolved/${id}_${Date.now()}.jpg`);
       }
 
-      const potholeRef = doc(db, 'potholes', id);
       const updateData: any = { status: newStatus };
       if (resolvedImageUrl) {
         updateData.resolvedImageUrl = resolvedImageUrl;
       }
       
-      try {
-        await updateDoc(potholeRef, updateData);
-      } catch (error) {
-        handleFirestoreError(error, OperationType.UPDATE, `potholes/${id}`);
-      }
+      const { error } = await supabase
+        .from('potholes')
+        .update(updateData)
+        .eq('id', id);
+
+      if (error) throw error;
+
       setResolvingId(null);
       clearSelection();
     } catch (error) {
@@ -145,7 +144,7 @@ export default function MunicipalDashboard({ potholes }: MunicipalDashboardProps
                           </div>
                           <div className="flex items-center gap-1.5 bg-black/40 px-2 py-1 rounded-md border border-zinc-800">
                             <Clock className="w-3 h-3 text-zinc-400" />
-                            <span>{new Date(p.timestamp?.seconds * 1000).toLocaleString()}</span>
+                            <span>{new Date(p.timestamp).toLocaleString()}</span>
                           </div>
                         </div>
                       </div>

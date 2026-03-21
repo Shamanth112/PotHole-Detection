@@ -1,8 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { auth, db } from './firebase';
-import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, User, updateProfile } from 'firebase/auth';
-import { doc, setDoc, getDoc, collection, addDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
-import { handleFirestoreError, OperationType } from './utils/errorHandlers';
+import { supabase } from './supabase';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import HomeView from './components/HomeView';
 import ReportView from './components/ReportView';
@@ -38,7 +35,7 @@ import { uploadPotholeImage } from './services/storageService';
 type Tab = 'home' | 'map' | 'history' | 'scan' | 'profile' | 'report';
 
 export default function App() {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<any>(null);
   const [userRole, setUserRole] = useState<'user' | 'admin' | 'municipal' | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('home');
@@ -61,7 +58,6 @@ export default function App() {
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         navigator.mediaDevices.getUserMedia({ video: true })
           .then(stream => {
-            // Stop tracks immediately after permission is granted to avoid keeping camera on
             stream.getTracks().forEach(track => track.stop());
           })
           .catch(err => console.error("Camera permission denied or error:", err));
@@ -72,74 +68,90 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      try {
-        if (user) {
-          const userRef = doc(db, 'users', user.uid);
-          const userSnap = await getDoc(userRef);
-          let role: 'user' | 'admin' | 'municipal' = 'user';
-          
-          const isDefaultAdmin = user.email === "shamanth.p2007@gmail.com";
-          
-          // Check permitted_users collection for assigned role
-          const permittedRef = doc(db, 'permitted_users', user.email?.toLowerCase().trim() || '');
-          const permittedSnap = await getDoc(permittedRef);
-          
-          if (permittedSnap.exists()) {
-            role = permittedSnap.data().role;
-          } else if (isDefaultAdmin) {
-            role = 'admin';
-          }
-
-          // Sync with users collection
-          await setDoc(userRef, {
-            uid: user.uid,
-            displayName: user.displayName,
-            email: user.email,
-            photoURL: user.photoURL,
-            role: role
-          }, { merge: true });
-
-          setUser(user);
-          setUserRole(role);
-        } else {
-          setUser(null);
-          setUserRole(null);
-        }
-      } catch (error: any) {
-        console.error("Auth state change error:", error);
-      } finally {
+    // Initial session check
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        handleUserAuth(session.user);
+      } else {
         setLoading(false);
       }
     });
-    return () => unsubscribe();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        handleUserAuth(session.user);
+      } else {
+        setUser(null);
+        setUserRole(null);
+        setLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const handleLogin = async () => {
-    const provider = new GoogleAuthProvider();
+  const handleUserAuth = async (supabaseUser: any) => {
     try {
-      await signInWithPopup(auth, provider);
-    } catch (error: any) {
-      // Ignore common user-cancellation errors
-      if (
-        error.code === 'auth/popup-closed-by-user' || 
-        error.code === 'auth/cancelled-popup-request'
-      ) {
-        return;
+      let role: 'user' | 'admin' | 'municipal' = 'user';
+      const email = supabaseUser.email?.toLowerCase().trim() || '';
+      const isDefaultAdmin = email === "shamanth.p2007@gmail.com";
+
+      // Check permitted_users table
+      const { data: permittedData } = await supabase
+        .from('permitted_users')
+        .select('role')
+        .eq('email', email)
+        .single();
+
+      if (permittedData) {
+        role = permittedData.role;
+      } else if (isDefaultAdmin) {
+        role = 'admin';
       }
 
-      console.error("Login failed:", error);
-      
-      if (error.code === 'auth/unauthorized-domain') {
-        alert("Domain not authorized! Please add your Vercel URL to the 'Authorized domains' list in the Firebase Console (Authentication > Settings).");
-      } else {
-        alert("Login failed: " + error.message);
-      }
+      // Sync with users table
+      const userData = {
+        uid: supabaseUser.id,
+        display_name: supabaseUser.user_metadata?.full_name || supabaseUser.email?.split('@')[0],
+        email: supabaseUser.email,
+        photo_url: supabaseUser.user_metadata?.avatar_url,
+        role: role
+      };
+
+      await supabase.from('users').upsert(userData, { onConflict: 'uid' });
+
+      setUser({
+        uid: supabaseUser.id,
+        email: supabaseUser.email,
+        displayName: userData.display_name,
+        photoURL: userData.photo_url
+      });
+      setUserRole(role);
+    } catch (error) {
+      console.error("Error handling user auth:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleLogout = () => {
-    auth.signOut();
+  const handleLogin = async () => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin
+        }
+      });
+      if (error) throw error;
+    } catch (error: any) {
+      console.error("Login failed:", error);
+      alert("Login failed: " + error.message);
+    }
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     navigate('/');
   };
 
@@ -149,15 +161,19 @@ export default function App() {
 
     try {
       const photoURL = await uploadPotholeImage(file, `profiles/${user.uid}_${Date.now()}.jpg`);
-      await updateProfile(user, { photoURL });
       
-      // Update Firestore user doc as well
-      await updateDoc(doc(db, 'users', user.uid), { photoURL });
+      // Update Supabase user metadata
+      await supabase.auth.updateUser({
+        data: { avatar_url: photoURL }
+      });
+
+      // Update users table
+      await supabase
+        .from('users')
+        .update({ photo_url: photoURL })
+        .eq('uid', user.uid);
       
-      // Force refresh user state
-      const updatedUser = auth.currentUser;
-      if (updatedUser) setUser({ ...updatedUser });
-      
+      setUser((prev: any) => ({ ...prev, photoURL }));
       alert("Profile photo updated successfully!");
     } catch (error) {
       console.error("Error uploading profile photo:", error);
@@ -168,13 +184,15 @@ export default function App() {
   const handleReportPothole = async (data: { latitude: number; longitude: number; severity: string; address?: string; reportImageUrl?: string; notes?: string }, isAuto = false) => {
     if (!user) return;
     try {
-      await addDoc(collection(db, 'potholes'), {
+      const { error } = await supabase.from('potholes').insert({
         ...data,
         userId: user.uid,
         userName: user.displayName || 'Road Guardian',
         status: 'reported',
-        timestamp: serverTimestamp(),
+        timestamp: new Date().toISOString()
       });
+
+      if (error) throw error;
       
       if (!isAuto) {
         setActiveTab('history');
@@ -185,15 +203,15 @@ export default function App() {
           colors: ['#ef4444', '#f97316', '#eab308']
         });
       }
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, 'potholes');
+    } catch (error: any) {
+      console.error("Error reporting pothole:", error);
+      alert("Failed to report pothole: " + error.message);
     }
   };
 
   const handleDetection = (detection: any, imageUrl: string) => {
     if (!userLocation) return;
     
-    // Auto-report to municipal silently
     handleReportPothole({
       latitude: userLocation.lat,
       longitude: userLocation.lng,
@@ -389,7 +407,7 @@ export default function App() {
                       stats={{
                         detectedToday: potholes.filter(p => {
                           const today = new Date();
-                          const pDate = new Date(p.timestamp?.seconds * 1000);
+                          const pDate = new Date(p.timestamp);
                           return pDate.toDateString() === today.toDateString();
                         }).length,
                         fixedThisWeek: potholes.filter(p => p.status === 'resolved').length
@@ -549,9 +567,9 @@ export default function App() {
                     </div>
                   </motion.div>
                 )}
-              </AnimatePresence>
-            </div>
-          </main>
+                </AnimatePresence>
+              </div>
+            </main>
 
             {/* Bottom Navigation (Mobile Only) */}
             <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-[#e2e8f0] px-6 py-3 flex justify-between items-center z-50 shadow-[0_-10px_20px_-5px_rgba(0,0,0,0.05)]">

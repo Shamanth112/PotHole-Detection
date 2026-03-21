@@ -1,7 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { loadModel, detectPotholes, Detection } from '../services/detectionService';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db, auth } from '../firebase';
+import { supabase } from '../supabase';
 import { Camera, AlertTriangle, ShieldCheck, ArrowLeft, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { uploadPotholeImageFromBlob } from '../services/storageService';
@@ -121,7 +120,8 @@ export default function CameraView({ onDetection, onBack, gpsActive }: CameraVie
   };
 
   const handlePotholeDetected = async (detection: Detection) => {
-    if (!auth.currentUser || !videoRef.current || !canvasRef.current || isUploading) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || !videoRef.current || !canvasRef.current || isUploading) return;
     
     setIsUploading(true);
     setShowShutter(true);
@@ -140,7 +140,7 @@ export default function CameraView({ onDetection, onBack, gpsActive }: CameraVie
         const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
         if (blob) {
           const reportId = `ai_report_${Date.now()}`;
-          const imageUrl = await uploadPotholeImageFromBlob(blob, `reports/${auth.currentUser.uid}/${reportId}.jpg`);
+          const imageUrl = await uploadPotholeImageFromBlob(blob, `reports/${user.id}/${reportId}.jpg`);
           onDetection(detection, imageUrl);
           
           // Show success toast

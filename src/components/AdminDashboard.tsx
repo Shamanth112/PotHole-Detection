@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { db, auth } from '../firebase';
-import { collection, getDocs, doc, setDoc, deleteDoc, query, onSnapshot, orderBy, limit, Timestamp, addDoc } from 'firebase/firestore';
-import { handleFirestoreError, OperationType } from '../utils/errorHandlers';
+import { supabase } from '../supabase';
 import { 
   UserPlus, Users, ShieldCheck, Mail, Trash2, Loader2, 
   LayoutDashboard, MapPin, Plus, AlertTriangle, CheckCircle2, Clock, 
-  TrendingUp, BarChart3, Shield
+  TrendingUp, BarChart3, Shield, X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -36,34 +34,78 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetchUsers();
-    
-    // Listen to potholes
-    const q = query(collection(db, 'potholes'), orderBy('timestamp', 'desc'), limit(100));
-    const unsubscribePotholes = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setPotholes(data);
-    });
+    fetchPotholes();
+    fetchPermittedUsers();
 
-    // Listen to permitted users
-    const unsubscribePermitted = onSnapshot(collection(db, 'permitted_users'), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setPermittedUsers(data);
-    });
+    // Set up real-time subscriptions
+    const potholesSubscription = supabase
+      .channel('potholes-admin')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'potholes' }, () => {
+        fetchPotholes();
+      })
+      .subscribe();
+
+    const permittedSubscription = supabase
+      .channel('permitted-admin')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'permitted_users' }, () => {
+        fetchPermittedUsers();
+      })
+      .subscribe();
+
+    const usersSubscription = supabase
+      .channel('users-admin')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => {
+        fetchUsers();
+      })
+      .subscribe();
 
     return () => {
-      unsubscribePotholes();
-      unsubscribePermitted();
+      supabase.removeChannel(potholesSubscription);
+      supabase.removeChannel(permittedSubscription);
+      supabase.removeChannel(usersSubscription);
     };
   }, []);
 
   const fetchUsers = async () => {
     try {
-      const querySnapshot = await getDocs(collection(db, 'users'));
-      const usersList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      usersList.sort((a: any, b: any) => (a.email || '').localeCompare(b.email || ''));
-      setUsers(usersList);
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .order('email');
+      
+      if (error) throw error;
+      setUsers(data || []);
     } catch (err) {
-      handleFirestoreError(err, OperationType.GET, 'users');
+      console.error("Error fetching users:", err);
+    }
+  };
+
+  const fetchPotholes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('potholes')
+        .select('*')
+        .order('timestamp', { ascending: false })
+        .limit(100);
+      
+      if (error) throw error;
+      setPotholes(data || []);
+    } catch (err) {
+      console.error("Error fetching potholes:", err);
+    }
+  };
+
+  const fetchPermittedUsers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('permitted_users')
+        .select('*')
+        .order('email');
+      
+      if (error) throw error;
+      setPermittedUsers(data || []);
+    } catch (err) {
+      console.error("Error fetching permitted users:", err);
     }
   };
 
@@ -75,16 +117,21 @@ export default function AdminDashboard() {
 
     try {
       const emailKey = newEmail.toLowerCase().trim();
-      await setDoc(doc(db, 'permitted_users', emailKey), {
-        email: emailKey,
-        role: newRole,
-        addedAt: new Date().toISOString()
-      });
+      const { error } = await supabase
+        .from('permitted_users')
+        .upsert({
+          email: emailKey,
+          role: newRole,
+          added_at: new Date().toISOString()
+        });
+
+      if (error) throw error;
 
       setNewEmail('');
       setSuccess(`Successfully added ${emailKey} as ${newRole}.`);
     } catch (err: any) {
-      handleFirestoreError(err, OperationType.WRITE, `permitted_users/${newEmail}`);
+      console.error("Error adding permitted user:", err);
+      setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -93,10 +140,15 @@ export default function AdminDashboard() {
   const handleDeletePermittedUser = async (email: string) => {
     if (!window.confirm(`Remove permissions for ${email}?`)) return;
     try {
-      await deleteDoc(doc(db, 'permitted_users', email));
+      const { error } = await supabase
+        .from('permitted_users')
+        .delete()
+        .eq('email', email);
+
+      if (error) throw error;
       setSuccess(`Permissions removed for ${email}.`);
     } catch (err: any) {
-      handleFirestoreError(err, OperationType.DELETE, `permitted_users/${email}`);
+      console.error("Error deleting permitted user:", err);
     }
   };
 
@@ -104,11 +156,15 @@ export default function AdminDashboard() {
     if (!window.confirm(`Are you sure you want to delete ${user.email} from registered users?`)) return;
     setDeletingId(user.id);
     try {
-      await deleteDoc(doc(db, 'users', user.id));
+      const { error } = await supabase
+        .from('users')
+        .delete()
+        .eq('id', user.id);
+
+      if (error) throw error;
       setSuccess(`User ${user.email} deleted.`);
-      fetchUsers();
     } catch (err: any) {
-      handleFirestoreError(err, OperationType.DELETE, `users/${user.id}`);
+      console.error("Error deleting user:", err);
     } finally {
       setDeletingId(null);
     }
@@ -118,21 +174,28 @@ export default function AdminDashboard() {
     e.preventDefault();
     setLoading(true);
     try {
-      await addDoc(collection(db, 'potholes'), {
-        latitude: parseFloat(newPothole.latitude),
-        longitude: parseFloat(newPothole.longitude),
-        severity: newPothole.severity,
-        address: newPothole.address || 'Manual Entry',
-        status: 'reported',
-        timestamp: Timestamp.now(),
-        userId: auth.currentUser?.uid || 'admin',
-        userName: 'Admin Manual Entry'
-      });
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const { error } = await supabase
+        .from('potholes')
+        .insert({
+          latitude: parseFloat(newPothole.latitude),
+          longitude: parseFloat(newPothole.longitude),
+          severity: newPothole.severity,
+          address: newPothole.address || 'Manual Entry',
+          status: 'reported',
+          timestamp: new Date().toISOString(),
+          user_id: user?.id || 'admin',
+          user_name: 'Admin Manual Entry'
+        });
+
+      if (error) throw error;
+
       setShowAddPothole(false);
       setNewPothole({ latitude: '', longitude: '', severity: 'medium', address: '' });
       setSuccess('Pothole manually added to system.');
     } catch (err: any) {
-      handleFirestoreError(err, OperationType.WRITE, 'potholes');
+      console.error("Error adding pothole:", err);
     } finally {
       setLoading(false);
     }
@@ -141,10 +204,15 @@ export default function AdminDashboard() {
   const handleDeletePothole = async (id: string) => {
     if (!window.confirm('Delete this pothole report permanently?')) return;
     try {
-      await deleteDoc(doc(db, 'potholes', id));
+      const { error } = await supabase
+        .from('potholes')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
       setSuccess('Pothole report removed.');
     } catch (err: any) {
-      handleFirestoreError(err, OperationType.DELETE, `potholes/${id}`);
+      console.error("Error deleting pothole:", err);
     }
   };
 
@@ -401,7 +469,7 @@ export default function AdminDashboard() {
                         <h4 className="text-sm font-bold text-white truncate">{p.address || 'Unknown Location'}</h4>
                         <div className="flex items-center gap-3 mt-1 text-[10px] font-bold text-zinc-500">
                           <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {p.latitude.toFixed(4)}, {p.longitude.toFixed(4)}</span>
-                          <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {new Date(p.timestamp?.seconds * 1000).toLocaleString()}</span>
+                          <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {new Date(p.timestamp).toLocaleString()}</span>
                           <span className={`px-2 py-0.5 rounded uppercase ${
                             p.status === 'resolved' ? 'bg-emerald-500/20 text-emerald-500' : 
                             p.status === 'fixing' ? 'bg-blue-500/20 text-blue-500' : 'bg-zinc-800 text-zinc-400'

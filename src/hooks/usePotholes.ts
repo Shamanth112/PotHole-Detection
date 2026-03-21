@@ -1,13 +1,11 @@
 import { useState, useEffect } from 'react';
-import { collection, query, onSnapshot, orderBy, limit, where, doc, getDoc } from 'firebase/firestore';
-import { auth, db } from '../firebase';
-import { onAuthStateChanged } from 'firebase/auth';
+import { supabase } from '../supabase';
 
 export interface Pothole {
   id: string;
   latitude: number;
   longitude: number;
-  timestamp: any;
+  timestamp: string;
   severity: 'low' | 'medium' | 'high';
   status: 'reported' | 'verified' | 'fixing' | 'resolved';
   reportImageUrl?: string;
@@ -15,73 +13,96 @@ export interface Pothole {
   userId: string;
   userName?: string;
   address?: string;
+  notes?: string;
 }
 
 export function usePotholes() {
   const [potholes, setPotholes] = useState<Pothole[]>([]);
   const [loading, setLoading] = useState(true);
   const [userState, setUserState] = useState<{ uid: string | null; role: string | null }>({
-    uid: auth.currentUser?.uid || null,
+    uid: null,
     role: null
   });
 
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        // Fetch role to determine query
-        const userRef = doc(db, 'users', user.uid);
-        const userSnap = await getDoc(userRef);
-        const role = userSnap.exists() ? userSnap.data().role : 'user';
-        setUserState({ uid: user.uid, role });
+    // Initial session check
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        fetchUserRole(session.user.id);
       } else {
         setUserState({ uid: null, role: null });
+        setLoading(false);
       }
     });
-    return () => unsubscribeAuth();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        fetchUserRole(session.user.id);
+      } else {
+        setUserState({ uid: null, role: null });
+        setPotholes([]);
+        setLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
+  const fetchUserRole = async (uid: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('role')
+        .eq('uid', uid)
+        .single();
+      
+      const role = data?.role || 'user';
+      setUserState({ uid, role });
+    } catch (error) {
+      console.error("Error fetching user role:", error);
+      setUserState({ uid, role: 'user' });
+    }
+  };
+
   useEffect(() => {
-    if (!userState.uid) {
-      setPotholes([]);
-      setLoading(false);
-      return;
-    }
+    if (!userState.uid) return;
 
-    let q;
-    // Admins and Municipal users can see all reports
-    if (userState.role === 'admin' || userState.role === 'municipal') {
-      q = query(
-        collection(db, 'potholes'),
-        orderBy('timestamp', 'desc'),
-        limit(50)
-      );
-    } else {
+    const fetchPotholes = async () => {
+      let query = supabase
+        .from('potholes')
+        .select('*')
+        .order('timestamp', { ascending: false })
+        .limit(50);
+
       // Regular users only see their own reports
-      // Note: This requires a composite index in Firestore for (userId ASC, timestamp DESC)
-      q = query(
-        collection(db, 'potholes'),
-        where('userId', '==', userState.uid),
-        orderBy('timestamp', 'desc'),
-        limit(50)
-      );
-    }
+      if (userState.role !== 'admin' && userState.role !== 'municipal') {
+        query = query.eq('userId', userState.uid);
+      }
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Pothole[];
-      setPotholes(data);
-      setLoading(false);
-    }, (error) => {
-      // Only log if it's not a permission error while logging out
-      if (error.code !== 'permission-denied') {
+      const { data, error } = await query;
+
+      if (error) {
         console.error("Error fetching potholes:", error);
+      } else {
+        setPotholes(data as Pothole[]);
       }
       setLoading(false);
-    });
+    };
 
-    return () => unsubscribe();
+    fetchPotholes();
+
+    // Subscribe to real-time changes
+    const channel = supabase
+      .channel('potholes-changes')
+      .on('postgres_changes', { event: '*', table: 'potholes', schema: 'public' }, () => {
+        fetchPotholes();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [userState]);
 
   return { potholes, loading };
