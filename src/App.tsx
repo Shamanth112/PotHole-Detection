@@ -8,7 +8,6 @@ import ReportView from './components/ReportView';
 import CameraView from './components/CameraView';
 import MapView from './components/MapView';
 import PotholeList from './components/PotholeList';
-import MunicipalLogin from './components/MunicipalLogin';
 import MunicipalDashboard from './components/MunicipalDashboard';
 import AdminDashboard from './components/AdminDashboard';
 import { usePotholes } from './hooks/usePotholes';
@@ -20,7 +19,6 @@ import {
   ShieldAlert,
   Activity,
   Settings,
-  Building2,
   ShieldCheck,
   ArrowLeft,
   User as UserIcon,
@@ -81,36 +79,25 @@ export default function App() {
           
           const isDefaultAdmin = user.email === "shamanth.p2007@gmail.com";
           
-          if (userSnap.exists()) {
-            role = userSnap.data().role;
-            if (isDefaultAdmin && role !== 'admin') {
-              role = 'admin';
-            }
-          } else {
-            const emailKey = user.email?.toLowerCase().trim() || '';
-            const emailRef = doc(db, 'users', emailKey);
-            const emailSnap = await getDoc(emailRef);
-            
-            if (emailSnap.exists() && emailSnap.data().role === 'municipal') {
-              role = 'municipal';
-              await setDoc(userRef, {
-                ...emailSnap.data(),
-                uid: user.uid,
-                isPending: false,
-                displayName: user.displayName || emailSnap.data().displayName || 'Municipal User',
-                photoURL: user.photoURL || null
-              });
-            } else {
-              role = isDefaultAdmin ? 'admin' : 'user';
-              await setDoc(userRef, {
-                uid: user.uid,
-                displayName: user.displayName,
-                email: user.email,
-                photoURL: user.photoURL,
-                role: role
-              });
-            }
+          // Check permitted_users collection for assigned role
+          const permittedRef = doc(db, 'permitted_users', user.email?.toLowerCase().trim() || '');
+          const permittedSnap = await getDoc(permittedRef);
+          
+          if (permittedSnap.exists()) {
+            role = permittedSnap.data().role;
+          } else if (isDefaultAdmin) {
+            role = 'admin';
           }
+
+          // Sync with users collection
+          await setDoc(userRef, {
+            uid: user.uid,
+            displayName: user.displayName,
+            email: user.email,
+            photoURL: user.photoURL,
+            role: role
+          }, { merge: true });
+
           setUser(user);
           setUserRole(role);
         } else {
@@ -119,9 +106,6 @@ export default function App() {
         }
       } catch (error: any) {
         console.error("Auth state change error:", error);
-        if (error.code === 'permission-denied') {
-          auth.signOut();
-        }
       } finally {
         setLoading(false);
       }
@@ -216,10 +200,6 @@ export default function App() {
 
   return (
     <Routes>
-      <Route path="/municipal" element={
-        !user ? <MunicipalLogin onBack={() => navigate('/')} /> : <Navigate to="/" />
-      } />
-      
       <Route path="/admin" element={
         user && userRole === 'admin' ? (
           <div className="min-h-screen bg-black text-white">
@@ -264,20 +244,6 @@ export default function App() {
                 >
                   <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="Google" />
                   Continue with Google
-                </button>
-                
-                <div className="flex items-center gap-4 text-white/20">
-                  <div className="h-px flex-1 bg-current" />
-                  <span className="text-[10px] font-black uppercase tracking-widest">Or</span>
-                  <div className="h-px flex-1 bg-current" />
-                </div>
-
-                <button 
-                  onClick={() => navigate('/municipal')}
-                  className="w-full bg-white/10 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-3 border border-white/20 hover:bg-white/20 transition-all active:scale-95"
-                >
-                  <Building2 className="w-5 h-5" />
-                  Municipal Login
                 </button>
               </div>
 

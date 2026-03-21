@@ -77,14 +77,21 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       // Allow creation if:
       // 1. Admin is creating it
-      // 2. User is creating their own 'user' profile
-      // 3. User is migrating a 'municipal' profile
-      allow create: if isAdmin() || 
-                    (isOwner(userId) && (
-                      request.resource.data.role == 'user' || 
-                      request.resource.data.role == 'municipal'
-                    ));
-      allow update: if isAdmin() || (isOwner(userId) && request.resource.data.role == resource.data.role);
+      // 2. User is creating their own profile
+      allow create: if isAdmin() || isOwner(userId);
+      
+      // Allow update if:
+      // 1. Admin is updating it
+      // 2. User is updating their own profile (role must match existing OR match permitted_users)
+      allow update: if isAdmin() || (
+        isOwner(userId) && (
+          request.resource.data.role == resource.data.role ||
+          (
+            exists(/databases/$(database)/documents/permitted_users/$(request.auth.token.email.toLower())) &&
+            request.resource.data.role == get(/databases/$(database)/documents/permitted_users/$(request.auth.token.email.toLower())).data.role
+          )
+        )
+      );
       allow delete: if isAdmin();
     }
 
@@ -93,6 +100,11 @@ service cloud.firestore {
       allow create: if isAuthenticated() && isValidPothole(request.resource.data);
       allow update: if isAdmin() || isMunicipal() || (isAuthenticated() && resource.data.userId == request.auth.uid);
       allow delete: if isAdmin();
+    }
+
+    match /permitted_users/{email} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
     }
   }
 }

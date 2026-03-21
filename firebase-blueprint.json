@@ -28,6 +28,16 @@
         "role": { "type": "string", "enum": ["user", "admin", "municipal"] }
       },
       "required": ["uid", "email"]
+    },
+    "permitted_user": {
+      "title": "Permitted User",
+      "description": "A user email permitted to have a specific role.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "admin", "municipal"] }
+      },
+      "required": ["email", "role"]
     }
   },
   "firestore": {
@@ -38,6 +48,10 @@
     "/users/{userId}": {
       "schema": "user",
       "description": "User profiles."
+    },
+    "/permitted_users/{email}": {
+      "schema": "permitted_user",
+      "description": "List of emails with assigned roles."
     }
   }
 }
