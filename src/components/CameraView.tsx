@@ -8,9 +8,10 @@ import { motion, AnimatePresence } from 'motion/react';
 interface CameraViewProps {
   onDetection: (detection: Detection) => void;
   onBack: () => void;
+  gpsActive: boolean;
 }
 
-export default function CameraView({ onDetection, onBack }: CameraViewProps) {
+export default function CameraView({ onDetection, onBack, gpsActive }: CameraViewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isModelLoading, setIsModelLoading] = useState(true);
@@ -120,17 +121,40 @@ export default function CameraView({ onDetection, onBack }: CameraViewProps) {
         className="absolute inset-0 w-full h-full object-cover pointer-events-none"
       />
       
+      {/* Scanning Line */}
+      <motion.div 
+        animate={{ top: ['0%', '100%', '0%'] }}
+        transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
+        className="absolute left-0 right-0 h-px bg-red-500/30 shadow-[0_0_15px_rgba(239,68,68,0.5)] z-10 pointer-events-none"
+      />
+      
       <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
         <div className="flex items-center gap-2 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20">
           <div className={`w-2 h-2 rounded-full ${isModelLoading ? 'bg-yellow-500 animate-pulse' : 'bg-red-600 animate-pulse'}`} />
           <span className="text-[10px] font-black uppercase tracking-widest text-white">
-            {isModelLoading ? 'AI Loading...' : 'REC'}
+            {isModelLoading ? 'AI Loading...' : 'AI ACTIVE'}
+          </span>
+        </div>
+        <div className="bg-black/40 backdrop-blur-md px-3 py-1 rounded-lg border border-white/10 flex items-center gap-2">
+          <div className={`w-1.5 h-1.5 rounded-full ${gpsActive ? 'bg-emerald-500' : 'bg-red-500 animate-pulse'}`} />
+          <span className="text-[10px] font-mono text-zinc-300">
+            GPS: {gpsActive ? 'LOCKED' : 'WAITING'}
           </span>
         </div>
         <div className="bg-black/40 backdrop-blur-md px-3 py-1 rounded-lg border border-white/10">
           <span className="text-[10px] font-mono text-zinc-300">
             {new Date().toLocaleTimeString()}
           </span>
+        </div>
+      </div>
+
+      {/* Simulation Info */}
+      <div className="absolute bottom-4 left-4 right-4 z-10">
+        <div className="bg-black/60 backdrop-blur-xl p-3 rounded-2xl border border-white/10 text-center">
+          <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">Simulation Mode</p>
+          <p className="text-[9px] text-zinc-500">
+            Use a <span className="text-white">cell phone, cup, bottle, or remote</span> as a stand-in for a pothole to test detection.
+          </p>
         </div>
       </div>
 
@@ -153,7 +177,7 @@ export default function CameraView({ onDetection, onBack }: CameraViewProps) {
                 </div>
               </div>
               <div className="bg-white text-red-600 px-3 py-1 rounded-lg font-black text-sm">
-                {Math.round(detections.find(d => d.class === 'pothole')?.score || 0 * 100)}%
+                {Math.round((detections.find(d => d.class === 'pothole')?.score || 0) * 100)}%
               </div>
             </div>
           </motion.div>

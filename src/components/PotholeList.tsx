@@ -58,6 +58,21 @@ export default function PotholeList({ potholes }: PotholeListProps) {
                     {p.address || `Pothole at ${p.latitude.toFixed(4)}, ${p.longitude.toFixed(4)}`}
                   </h3>
                   <p className="text-xs text-[#718096] font-medium">Reported by {p.userName || 'Anonymous'}</p>
+                  
+                  <div className="flex gap-2 mt-2 overflow-x-auto pb-2">
+                    {p.reportImageUrl && (
+                      <div className="shrink-0">
+                        <p className="text-[8px] font-black text-[#a0aec0] uppercase tracking-widest mb-1">Report</p>
+                        <img src={p.reportImageUrl} className="w-20 h-20 object-cover rounded-xl border border-[#e2e8f0]" alt="Report" referrerPolicy="no-referrer" />
+                      </div>
+                    )}
+                    {p.resolvedImageUrl && (
+                      <div className="shrink-0">
+                        <p className="text-[8px] font-black text-emerald-500 uppercase tracking-widest mb-1">Resolved</p>
+                        <img src={p.resolvedImageUrl} className="w-20 h-20 object-cover rounded-xl border border-emerald-500/30" alt="Resolved" referrerPolicy="no-referrer" />
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="space-y-3">

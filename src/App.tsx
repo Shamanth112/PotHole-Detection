@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { auth, db } from './firebase';
-import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, User } from 'firebase/auth';
-import { doc, setDoc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, User, updateProfile } from 'firebase/auth';
+import { doc, setDoc, getDoc, collection, addDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import HomeView from './components/HomeView';
 import ReportView from './components/ReportView';
@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import confetti from 'canvas-confetti';
+import { uploadPotholeImage } from './services/storageService';
 
 type Tab = 'home' | 'map' | 'history' | 'scan' | 'profile' | 'report';
 
@@ -132,23 +133,48 @@ export default function App() {
     navigate('/');
   };
 
-  const handleReportPothole = async (data: { latitude: number; longitude: number; severity: string; address?: string }) => {
+  const handleProfilePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    try {
+      const photoURL = await uploadPotholeImage(file, `profiles/${user.uid}_${Date.now()}.jpg`);
+      await updateProfile(user, { photoURL });
+      
+      // Update Firestore user doc as well
+      await updateDoc(doc(db, 'users', user.uid), { photoURL });
+      
+      // Force refresh user state
+      const updatedUser = auth.currentUser;
+      if (updatedUser) setUser({ ...updatedUser });
+      
+      alert("Profile photo updated successfully!");
+    } catch (error) {
+      console.error("Error uploading profile photo:", error);
+      alert("Failed to upload profile photo.");
+    }
+  };
+
+  const handleReportPothole = async (data: { latitude: number; longitude: number; severity: string; address?: string; reportImageUrl?: string }, isAuto = false) => {
     if (!user) return;
     try {
       await addDoc(collection(db, 'potholes'), {
         ...data,
         userId: user.uid,
-        userName: user.displayName,
+        userName: user.displayName || 'Road Guardian',
         status: 'reported',
         timestamp: serverTimestamp(),
       });
-      setActiveTab('history');
-      confetti({
-        particleCount: 100,
-        spread: 70,
-        origin: { y: 0.6 },
-        colors: ['#ef4444', '#f97316', '#eab308']
-      });
+      
+      if (!isAuto) {
+        setActiveTab('history');
+        confetti({
+          particleCount: 100,
+          spread: 70,
+          origin: { y: 0.6 },
+          colors: ['#ef4444', '#f97316', '#eab308']
+        });
+      }
     } catch (error) {
       console.error("Error reporting pothole:", error);
     }
@@ -157,13 +183,13 @@ export default function App() {
   const handleDetection = (detection: any) => {
     if (!userLocation) return;
     
-    // Auto-report to municipal
+    // Auto-report to municipal silently
     handleReportPothole({
       latitude: userLocation.lat,
       longitude: userLocation.lng,
       severity: detection.score > 0.8 ? 'high' : 'medium',
       address: 'AI Detected - Road Focus Active'
-    });
+    }, true);
   };
 
   if (loading) {
@@ -385,7 +411,11 @@ export default function App() {
                     exit={{ opacity: 0, scale: 1.05 }}
                     className="h-full"
                   >
-                    <CameraView onDetection={handleDetection} onBack={() => setActiveTab('home')} />
+                    <CameraView 
+                      onDetection={handleDetection} 
+                      onBack={() => setActiveTab('home')} 
+                      gpsActive={!!userLocation}
+                    />
                   </motion.div>
                 )}
 
@@ -422,12 +452,18 @@ export default function App() {
                       </div>
                       
                       <div className="flex items-center gap-4">
-                        <div className="w-20 h-20 rounded-3xl border-4 border-white/20 overflow-hidden shadow-2xl">
-                          <img 
-                            src={user.photoURL || `https://ui-avatars.com/api/?name=${user.email}`} 
-                            className="w-full h-full object-cover"
-                            alt="Profile"
-                          />
+                        <div className="relative group">
+                          <div className="w-20 h-20 rounded-3xl border-4 border-white/20 overflow-hidden shadow-2xl">
+                            <img 
+                              src={user.photoURL || `https://ui-avatars.com/api/?name=${user.email}`} 
+                              className="w-full h-full object-cover"
+                              alt="Profile"
+                            />
+                          </div>
+                          <label className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded-3xl">
+                            <Camera className="w-6 h-6 text-white" />
+                            <input type="file" className="hidden" accept="image/*" onChange={handleProfilePhotoUpload} />
+                          </label>
                         </div>
                         <div>
                           <h2 className="text-xl font-bold">{user.displayName || 'Road Guardian'}</h2>

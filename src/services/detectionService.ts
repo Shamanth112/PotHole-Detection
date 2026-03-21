@@ -26,8 +26,8 @@ export async function detectPotholes(video: HTMLVideoElement): Promise<Detection
   
   // In a real app, we'd use a custom model trained specifically for potholes.
   // For this demo, we'll simulate pothole detection by looking for specific objects 
-  // that might be used as stand-ins during testing (bowl, cell phone, cup).
-  const mockPotholeClasses = ['bowl', 'cell phone', 'cup', 'donut'];
+  // that might be used as stand-ins during testing (bowl, cell phone, cup, bottle, remote).
+  const mockPotholeClasses = ['bowl', 'cell phone', 'cup', 'donut', 'bottle', 'remote', 'mouse'];
   
   return predictions.map(p => ({
     bbox: p.bbox as [number, number, number, number],

@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Pothole } from '../hooks/usePotholes';
-import { MapPin, User, Navigation, Clock, ShieldAlert, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
-import { motion } from 'motion/react';
+import { MapPin, User, Navigation, Clock, ShieldAlert, CheckCircle2, Loader2, AlertCircle, Camera, Image as ImageIcon, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
+import { uploadPotholeImage } from '../services/storageService';
 
 interface MunicipalDashboardProps {
   potholes: Pothole[];
@@ -11,14 +12,51 @@ interface MunicipalDashboardProps {
 
 export default function MunicipalDashboard({ potholes }: MunicipalDashboardProps) {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [resolvingId, setResolvingId] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      const url = URL.createObjectURL(file);
+      setPreviewUrl(url);
+    }
+  };
+
+  const clearSelection = () => {
+    setSelectedFile(null);
+    setPreviewUrl(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
   const updateStatus = async (id: string, newStatus: Pothole['status']) => {
+    if (newStatus === 'resolved' && !selectedFile && resolvingId !== id) {
+      setResolvingId(id);
+      return;
+    }
+
     setUpdatingId(id);
     try {
+      let resolvedImageUrl = '';
+      if (newStatus === 'resolved' && selectedFile) {
+        resolvedImageUrl = await uploadPotholeImage(selectedFile, `resolved/${id}_${Date.now()}.jpg`);
+      }
+
       const potholeRef = doc(db, 'potholes', id);
-      await updateDoc(potholeRef, { status: newStatus });
+      const updateData: any = { status: newStatus };
+      if (resolvedImageUrl) {
+        updateData.resolvedImageUrl = resolvedImageUrl;
+      }
+      
+      await updateDoc(potholeRef, updateData);
+      setResolvingId(null);
+      clearSelection();
     } catch (error) {
       console.error("Error updating status:", error);
+      alert("Failed to update status. Please try again.");
     } finally {
       setUpdatingId(null);
     }
@@ -73,6 +111,28 @@ export default function MunicipalDashboard({ potholes }: MunicipalDashboardProps
                         <h3 className="font-bold text-lg text-white mb-1 group-hover:text-blue-400 transition-colors">
                           {p.address || `Pothole at ${p.latitude.toFixed(6)}, ${p.longitude.toFixed(6)}`}
                         </h3>
+                        {p.reportImageUrl && (
+                          <div className="mt-2 mb-3">
+                            <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1">Report Photo</p>
+                            <img 
+                              src={p.reportImageUrl} 
+                              alt="Reported Pothole" 
+                              className="w-32 h-32 object-cover rounded-xl border border-zinc-800"
+                              referrerPolicy="no-referrer"
+                            />
+                          </div>
+                        )}
+                        {p.resolvedImageUrl && (
+                          <div className="mt-2 mb-3">
+                            <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest mb-1">Resolution Photo</p>
+                            <img 
+                              src={p.resolvedImageUrl} 
+                              alt="Resolved Pothole" 
+                              className="w-32 h-32 object-cover rounded-xl border border-emerald-500/30"
+                              referrerPolicy="no-referrer"
+                            />
+                          </div>
+                        )}
                         <div className="flex flex-wrap items-center gap-4 text-xs text-zinc-500">
                           <div className="flex items-center gap-1.5 bg-black/40 px-2 py-1 rounded-md border border-zinc-800">
                             <Navigation className="w-3 h-3 text-blue-500" />
@@ -137,6 +197,65 @@ export default function MunicipalDashboard({ potholes }: MunicipalDashboardProps
                       loading={updatingId === p.id}
                     />
                   </div>
+
+                  <AnimatePresence>
+                    {resolvingId === p.id && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="mt-4 p-4 bg-zinc-800/50 rounded-2xl border border-zinc-700 overflow-hidden"
+                      >
+                        <div className="flex flex-col gap-4">
+                          <div className="flex items-center justify-between">
+                            <h4 className="text-sm font-bold text-white">Upload Resolution Photo</h4>
+                            <button onClick={() => setResolvingId(null)} className="text-zinc-500 hover:text-white">
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                          
+                          <div className="flex items-center gap-4">
+                            {!previewUrl ? (
+                              <button 
+                                onClick={() => fileInputRef.current?.click()}
+                                className="w-full h-32 border-2 border-dashed border-zinc-700 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-blue-500/50 transition-all"
+                              >
+                                <Camera className="w-6 h-6 text-zinc-500" />
+                                <span className="text-xs font-bold text-zinc-500">Take Photo or Upload</span>
+                              </button>
+                            ) : (
+                              <div className="relative w-full h-32">
+                                <img src={previewUrl} className="w-full h-full object-cover rounded-xl" alt="Preview" />
+                                <button 
+                                  onClick={clearSelection}
+                                  className="absolute top-2 right-2 p-1 bg-black/60 rounded-full text-white hover:bg-black/80"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+                            )}
+                            <input 
+                              type="file" 
+                              ref={fileInputRef}
+                              onChange={handleFileChange}
+                              accept="image/*"
+                              capture="environment"
+                              className="hidden"
+                            />
+                          </div>
+
+                          <button
+                            disabled={!selectedFile || updatingId === p.id}
+                            onClick={() => updateStatus(p.id, 'resolved')}
+                            className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 disabled:text-zinc-500 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2"
+                          >
+                            {updatingId === p.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                            Confirm Resolution
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               </motion.div>
             ))

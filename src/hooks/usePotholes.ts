@@ -9,7 +9,8 @@ export interface Pothole {
   timestamp: any;
   severity: 'low' | 'medium' | 'high';
   status: 'reported' | 'verified' | 'fixing' | 'resolved';
-  imageUrl?: string;
+  reportImageUrl?: string;
+  resolvedImageUrl?: string;
   userId: string;
   userName?: string;
   address?: string;

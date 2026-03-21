@@ -9,9 +9,12 @@
 //   - longitude: number (required) - GPS longitude
 //   - timestamp: timestamp (required) - When the pothole was detected
 //   - severity: string (optional) - low, medium, high
-//   - imageUrl: string (optional) - URL to the captured image
+//   - reportImageUrl: string (optional) - URL to the reporter's image
+//   - resolvedImageUrl: string (optional) - URL to the resolution image
 //   - userId: string (required) - UID of the user who detected it
+//   - userName: string (optional) - Name of the user
 //   - address: string (optional) - Reverse geocoded address
+//   - status: string (optional) - reported, verified, fixing, resolved
 //
 // Collection: users
 // Document ID: userId (UID)
@@ -55,11 +58,11 @@ service cloud.firestore {
              data.latitude is number &&
              data.longitude is number &&
              data.timestamp is timestamp &&
-             data.userId == request.auth.uid &&
              (!('severity' in data) || data.severity in ['low', 'medium', 'high']) &&
-             (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() < 2048)) &&
+             (!('reportImageUrl' in data) || (data.reportImageUrl is string && data.reportImageUrl.size() < 2048)) &&
+             (!('resolvedImageUrl' in data) || (data.resolvedImageUrl is string && data.resolvedImageUrl.size() < 2048)) &&
              (!('address' in data) || (data.address is string && data.address.size() < 500)) &&
-             (!('status' in data) || data.status in ['reported', 'fixed', 'verified']);
+             (!('status' in data) || data.status in ['reported', 'verified', 'fixing', 'resolved']);
     }
 
     function isValidUser(data) {
@@ -97,8 +100,8 @@ service cloud.firestore {
 
     match /potholes/{potholeId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && isValidPothole(request.resource.data);
-      allow update: if isAdmin() || isMunicipal() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow create: if isAuthenticated() && isValidPothole(request.resource.data) && request.resource.data.userId == request.auth.uid;
+      allow update: if isAdmin() || isMunicipal() || (isAuthenticated() && resource.data.userId == request.auth.uid && isValidPothole(request.resource.data));
       allow delete: if isAdmin();
     }
 

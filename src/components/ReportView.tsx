@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Upload, MapPin, CheckCircle2, AlertTriangle, Info, ArrowLeft, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Upload, MapPin, CheckCircle2, AlertTriangle, Info, ArrowLeft, Loader2, Camera, X } from 'lucide-react';
 import { motion } from 'motion/react';
+import { uploadPotholeImage } from '../services/storageService';
+import { auth } from '../firebase';
 
 interface ReportViewProps {
   onBack: () => void;
@@ -13,6 +15,24 @@ export default function ReportView({ onBack, onSubmit }: ReportViewProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [location, setLocation] = useState<{ lat: number; lng: number; address: string } | null>(null);
   const [isLocating, setIsLocating] = useState(true);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      const url = URL.createObjectURL(file);
+      setPreviewUrl(url);
+    }
+  };
+
+  const clearSelection = () => {
+    setSelectedFile(null);
+    setPreviewUrl(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
   useEffect(() => {
     if ("geolocation" in navigator) {
@@ -41,21 +61,33 @@ export default function ReportView({ onBack, onSubmit }: ReportViewProps) {
     }
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedFile) {
+      alert("Please upload a photo of the pothole.");
+      return;
+    }
+    
     setIsSubmitting(true);
     
-    // Simulate submission
-    setTimeout(() => {
+    try {
+      const reportId = `report_${Date.now()}`;
+      const reportImageUrl = await uploadPotholeImage(selectedFile, `reports/${auth.currentUser?.uid}/${reportId}.jpg`);
+
       onSubmit({ 
         severity, 
         notes,
         latitude: location?.lat || 40.7128,
         longitude: location?.lng || -74.0060,
-        address: location?.address || 'Unknown Location'
+        address: location?.address || 'Unknown Location',
+        reportImageUrl
       });
+    } catch (error) {
+      console.error("Error submitting report:", error);
+      alert("Failed to submit report. Please try again.");
+    } finally {
       setIsSubmitting(false);
-    }, 1500);
+    }
   };
 
   return (
@@ -73,13 +105,37 @@ export default function ReportView({ onBack, onSubmit }: ReportViewProps) {
         {/* Photo Evidence */}
         <section>
           <h3 className="text-sm font-bold text-[#4a5568] mb-4 uppercase tracking-wider">Photo Evidence</h3>
-          <div className="aspect-video border-2 border-dashed border-[#cbd5e0] rounded-2xl flex flex-col items-center justify-center gap-4 bg-[#f7fafc] hover:bg-[#edf2f7] transition-all cursor-pointer">
-            <Upload className="w-12 h-12 text-[#a0aec0]" />
-            <div className="text-center">
-              <p className="font-bold text-[#4a5568]">Tap to upload photo</p>
-              <p className="text-xs text-[#718096]">or use camera</p>
+          {!previewUrl ? (
+            <div 
+              onClick={() => fileInputRef.current?.click()}
+              className="aspect-video border-2 border-dashed border-[#cbd5e0] rounded-2xl flex flex-col items-center justify-center gap-4 bg-[#f7fafc] hover:bg-[#edf2f7] transition-all cursor-pointer"
+            >
+              <Camera className="w-12 h-12 text-[#a0aec0]" />
+              <div className="text-center">
+                <p className="font-bold text-[#4a5568]">Tap to take photo</p>
+                <p className="text-xs text-[#718096]">or upload from gallery</p>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="relative aspect-video rounded-2xl overflow-hidden border-2 border-[#1a365d] shadow-lg">
+              <img src={previewUrl} className="w-full h-full object-cover" alt="Preview" />
+              <button 
+                type="button"
+                onClick={clearSelection}
+                className="absolute top-4 right-4 p-2 bg-black/60 rounded-full text-white hover:bg-black/80"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          )}
+          <input 
+            type="file" 
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+          />
         </section>
 
         {/* Location */}
