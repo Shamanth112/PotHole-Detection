@@ -48,13 +48,26 @@ export default function App() {
   const location = useLocation();
 
   useEffect(() => {
+    // Request GPS permission
     if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition((position) => {
+      const watchId = navigator.geolocation.watchPosition((position) => {
         setUserLocation({
           lat: position.coords.latitude,
           lng: position.coords.longitude
         });
-      });
+      }, (error) => console.error("Error watching position:", error), { enableHighAccuracy: true });
+      
+      // Request Camera permission (trigger prompt)
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices.getUserMedia({ video: true })
+          .then(stream => {
+            // Stop tracks immediately after permission is granted to avoid keeping camera on
+            stream.getTracks().forEach(track => track.stop());
+          })
+          .catch(err => console.error("Camera permission denied or error:", err));
+      }
+
+      return () => navigator.geolocation.clearWatch(watchId);
     }
   }, []);
 

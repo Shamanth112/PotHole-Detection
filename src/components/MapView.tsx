@@ -15,6 +15,7 @@ export default function MapView({ potholes, onAddReport }: MapViewProps) {
   const [selectedPothole, setSelectedPothole] = useState<Pothole | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>({ lat: 37.42, lng: -122.08 });
+  const [hasInitializedCenter, setHasInitializedCenter] = useState(false);
   const [filter, setFilter] = useState<'all' | 'low' | 'medium' | 'high'>('all');
 
   useEffect(() => {
@@ -22,10 +23,16 @@ export default function MapView({ potholes, onAddReport }: MapViewProps) {
       const watchId = navigator.geolocation.watchPosition(
         (position) => {
           const { latitude, longitude } = position.coords;
-          setUserLocation({ lat: latitude, lng: longitude });
-          if (!userLocation) {
-            setMapCenter({ lat: latitude, lng: longitude });
-          }
+          const newLocation = { lat: latitude, lng: longitude };
+          setUserLocation(newLocation);
+          
+          setHasInitializedCenter(prev => {
+            if (!prev) {
+              setMapCenter(newLocation);
+              return true;
+            }
+            return prev;
+          });
         },
         (error) => console.error("Error watching position:", error),
         { enableHighAccuracy: true }
@@ -82,7 +89,8 @@ export default function MapView({ potholes, onAddReport }: MapViewProps) {
       <div className="flex-1 relative">
         <APIProvider apiKey={API_KEY} version="weekly">
           <Map
-            defaultCenter={mapCenter}
+            center={mapCenter}
+            onCenterChanged={(ev) => setMapCenter(ev.detail.center)}
             defaultZoom={15}
             mapId="POTHOLE_MAP_ID"
             internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
