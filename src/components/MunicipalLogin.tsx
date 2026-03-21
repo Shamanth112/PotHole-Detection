@@ -83,9 +83,9 @@ export default function MunicipalLogin({ onBack }: MunicipalLoginProps) {
               <Building2 className="w-8 h-8 text-white" />
             </div>
             <h2 className="text-2xl font-black text-white uppercase tracking-tighter italic">
-              Municipal <span className="text-blue-500">Login</span>
+              Pothole<span className="text-blue-500">Detection</span> IDP
             </h2>
-            <p className="text-zinc-500 text-sm mt-2">Authorized Personnel Only</p>
+            <p className="text-zinc-500 text-sm mt-2">Municipal Access Portal</p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-6">
