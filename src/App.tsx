@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { auth, db } from './firebase';
 import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, User } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
+import HomeView from './components/HomeView';
+import ReportView from './components/ReportView';
 import CameraView from './components/CameraView';
 import MapView from './components/MapView';
 import PotholeList from './components/PotholeList';
@@ -23,19 +25,38 @@ import {
   ArrowLeft,
   User as UserIcon,
   History,
-  Scan
+  Scan,
+  Home as HomeIcon,
+  ChevronRight,
+  Bell,
+  Award,
+  Shield
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import confetti from 'canvas-confetti';
+
+type Tab = 'home' | 'map' | 'history' | 'scan' | 'profile' | 'report';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [userRole, setUserRole] = useState<'user' | 'admin' | 'municipal' | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'map' | 'scan' | 'history' | 'profile'>('map');
+  const [activeTab, setActiveTab] = useState<Tab>('home');
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const { potholes } = usePotholes();
   const navigate = useNavigate();
   const location = useLocation();
+
+  useEffect(() => {
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition((position) => {
+        setUserLocation({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        });
+      });
+    }
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -114,12 +135,35 @@ export default function App() {
     navigate('/');
   };
 
-  const handleDetection = () => {
-    confetti({
-      particleCount: 100,
-      spread: 70,
-      origin: { y: 0.6 },
-      colors: ['#ef4444', '#f97316', '#eab308']
+  const handleReportPothole = async (data: { latitude: number; longitude: number; severity: string; address?: string }) => {
+    if (!user) return;
+    try {
+      await addDoc(collection(db, 'potholes'), {
+        ...data,
+        userId: user.uid,
+        userName: user.displayName,
+        status: 'reported',
+        timestamp: serverTimestamp(),
+      });
+      setActiveTab('history');
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#ef4444', '#f97316', '#eab308']
+      });
+    } catch (error) {
+      console.error("Error reporting pothole:", error);
+    }
+  };
+
+  const handleDetection = (detection: any) => {
+    // For demo, we'll just report it
+    handleReportPothole({
+      latitude: (userLocation?.lat || 40.7128) + (Math.random() - 0.5) * 0.001,
+      longitude: (userLocation?.lng || -74.0060) + (Math.random() - 0.5) * 0.001,
+      severity: 'medium',
+      address: 'Detected via AI Camera'
     });
   };
 
@@ -182,139 +226,337 @@ export default function App() {
 
       <Route path="/" element={
         !user ? (
-          <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 relative overflow-hidden">
-            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-red-600/10 blur-[120px] rounded-full" />
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="z-10 text-center max-w-md">
-              <div className="inline-flex items-center justify-center w-20 h-20 bg-red-600 rounded-3xl shadow-2xl mb-8 rotate-3">
-                <ShieldAlert className="w-10 h-10 text-white" />
+          <div className="min-h-screen bg-[#1a365d] flex flex-col items-center justify-center p-6 text-white font-sans">
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="w-full max-w-md text-center space-y-8"
+            >
+              <div className="flex flex-col items-center gap-4">
+                <div className="w-24 h-24 bg-white/10 rounded-3xl flex items-center justify-center backdrop-blur-xl border border-white/20 shadow-2xl">
+                  <Shield className="w-12 h-12 text-white" />
+                </div>
+                <h1 className="text-4xl font-black tracking-tighter">RoadGuard</h1>
+                <p className="text-blue-100/70 text-sm font-medium max-w-[240px] mx-auto">
+                  AI-Powered Pothole Detection & Road Safety Management
+                </p>
               </div>
-              <h1 className="text-5xl font-black text-white mb-4 tracking-tighter uppercase italic">
-                Pothole<span className="text-red-600">Detection</span> IDP
-              </h1>
-              <p className="text-zinc-400 mb-12 text-lg">Real-time AI-powered dashcam for safer roads.</p>
-              <div className="space-y-4">
-                <button onClick={handleLogin} className="w-full py-4 bg-white text-black font-bold rounded-2xl hover:scale-[1.02] transition-all flex items-center justify-center gap-3">
+
+              <div className="space-y-4 pt-8">
+                <button 
+                  onClick={handleLogin}
+                  className="w-full bg-white text-[#1a365d] py-4 rounded-2xl font-bold flex items-center justify-center gap-3 shadow-xl hover:bg-blue-50 transition-all active:scale-95"
+                >
                   <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="Google" />
-                  Citizen Login
+                  Continue with Google
                 </button>
-                <button onClick={() => navigate('/municipal')} className="w-full py-4 bg-zinc-900 text-white font-bold rounded-2xl border border-zinc-800 hover:bg-zinc-800 transition-all flex items-center justify-center gap-3">
-                  <Building2 className="w-5 h-5 text-blue-500" />
+                
+                <div className="flex items-center gap-4 text-white/20">
+                  <div className="h-px flex-1 bg-current" />
+                  <span className="text-[10px] font-black uppercase tracking-widest">Or</span>
+                  <div className="h-px flex-1 bg-current" />
+                </div>
+
+                <button 
+                  onClick={() => navigate('/municipal')}
+                  className="w-full bg-white/10 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-3 border border-white/20 hover:bg-white/20 transition-all active:scale-95"
+                >
+                  <Building2 className="w-5 h-5" />
                   Municipal Login
                 </button>
               </div>
+
+              <p className="text-[10px] text-white/40 font-medium pt-12">
+                By continuing, you agree to our Terms & Privacy Policy
+              </p>
             </motion.div>
           </div>
         ) : (
-          <div className="min-h-screen bg-black text-zinc-100 font-sans flex flex-col">
-            {/* Mobile Header */}
-            <header className="h-16 border-b border-zinc-800 bg-black/50 backdrop-blur-xl flex items-center justify-between px-6 sticky top-0 z-50">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-red-600">
-                  <ShieldAlert className="w-5 h-5 text-white" />
+          <div className="min-h-screen bg-[#f7fafc] flex font-sans relative overflow-hidden">
+            {/* Desktop Sidebar */}
+            <aside className="hidden md:flex flex-col w-64 bg-[#1a365d] text-white p-6 sticky top-0 h-screen shadow-2xl z-50">
+              <div className="flex items-center gap-3 mb-12">
+                <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-xl border border-white/20">
+                  <Shield className="w-6 h-6 text-white" />
                 </div>
-                <span className="font-black text-xl tracking-tighter uppercase italic">
-                  Pothole<span className="text-red-600">Detection</span> IDP
-                </span>
+                <span className="font-black text-xl tracking-tighter uppercase italic">RoadGuard</span>
               </div>
-              <div className="flex items-center gap-4">
+
+              <nav className="flex-1 space-y-2">
+                <SidebarButton 
+                  active={activeTab === 'home'} 
+                  onClick={() => setActiveTab('home')} 
+                  icon={<HomeIcon className="w-5 h-5" />} 
+                  label="Dashboard" 
+                />
+                <SidebarButton 
+                  active={activeTab === 'map'} 
+                  onClick={() => setActiveTab('map')} 
+                  icon={<MapIcon className="w-5 h-5" />} 
+                  label="Live Map" 
+                />
+                <SidebarButton 
+                  active={activeTab === 'history'} 
+                  onClick={() => setActiveTab('history')} 
+                  icon={<History className="w-5 h-5" />} 
+                  label="Report History" 
+                />
+                <SidebarButton 
+                  active={activeTab === 'scan'} 
+                  onClick={() => setActiveTab('scan')} 
+                  icon={<Scan className="w-5 h-5" />} 
+                  label="AI Scanner" 
+                />
+                <SidebarButton 
+                  active={activeTab === 'profile'} 
+                  onClick={() => setActiveTab('profile')} 
+                  icon={<UserIcon className="w-5 h-5" />} 
+                  label="My Profile" 
+                />
                 {userRole === 'admin' && (
-                  <button onClick={() => navigate('/admin')} className="hidden sm:flex items-center gap-2 bg-emerald-600/20 text-emerald-500 px-3 py-1.5 rounded-full border border-emerald-500/30 text-[10px] font-bold uppercase">
-                    <ShieldCheck className="w-3 h-3" /> Admin
-                  </button>
+                  <SidebarButton 
+                    active={false} 
+                    onClick={() => navigate('/admin')} 
+                    icon={<ShieldCheck className="w-5 h-5 text-emerald-500" />} 
+                    label="Admin Console" 
+                  />
                 )}
-                <img src={user.photoURL || `https://ui-avatars.com/api/?name=${user.email}`} className="w-8 h-8 rounded-full border border-zinc-700" alt="User" />
+              </nav>
+
+              <div className="mt-auto pt-6 border-t border-white/10">
+                <div className="flex items-center gap-3 mb-6">
+                  <img 
+                    src={user.photoURL || `https://ui-avatars.com/api/?name=${user.email}`} 
+                    className="w-10 h-10 rounded-xl border border-white/20"
+                    alt="User"
+                  />
+                  <div className="min-w-0">
+                    <p className="font-bold text-sm truncate">{user.displayName || 'Guardian'}</p>
+                    <p className="text-[10px] text-blue-200/50 truncate">{user.email}</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-3 p-3 text-red-400 hover:bg-red-500/10 rounded-xl transition-all text-sm font-bold"
+                >
+                  <LogOut className="w-5 h-5" />
+                  Sign Out
+                </button>
               </div>
-            </header>
+            </aside>
 
             {/* Main Content Area */}
-            <main className="flex-1 relative overflow-hidden">
-              <AnimatePresence mode="wait">
+            <main className="flex-1 relative overflow-hidden pb-20 md:pb-0">
+              <div className="h-full max-w-6xl mx-auto">
+                <AnimatePresence mode="wait">
+                {activeTab === 'home' && (
+                  <motion.div 
+                    key="home"
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 20 }}
+                    className="h-full"
+                  >
+                    <HomeView 
+                      onStartDetection={() => setActiveTab('scan')}
+                      onReportManually={() => setActiveTab('report')}
+                      stats={{
+                        detectedToday: potholes.filter(p => {
+                          const today = new Date();
+                          const pDate = new Date(p.timestamp?.seconds * 1000);
+                          return pDate.toDateString() === today.toDateString();
+                        }).length,
+                        fixedThisWeek: potholes.filter(p => p.status === 'resolved').length
+                      }}
+                    />
+                  </motion.div>
+                )}
+
                 {activeTab === 'map' && (
-                  <motion.div key="map" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0">
-                    <MapView potholes={potholes} />
+                  <motion.div 
+                    key="map"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="h-full"
+                  >
+                    <MapView potholes={potholes} onAddReport={() => setActiveTab('report')} />
                   </motion.div>
                 )}
-                {activeTab === 'scan' && (
-                  <motion.div key="scan" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="absolute inset-0 z-10">
-                    <CameraView onDetection={handleDetection} />
-                  </motion.div>
-                )}
+
                 {activeTab === 'history' && (
-                  <motion.div key="history" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="absolute inset-0 bg-black p-4 overflow-y-auto">
-                    <div className="max-w-2xl mx-auto">
-                      <h2 className="text-2xl font-black uppercase italic mb-6">My Reports</h2>
-                      <PotholeList potholes={potholes.filter(p => p.userId === user.uid)} />
-                    </div>
+                  <motion.div 
+                    key="history"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    className="h-full"
+                  >
+                    <PotholeList potholes={potholes} />
                   </motion.div>
                 )}
+
+                {activeTab === 'scan' && (
+                  <motion.div 
+                    key="scan"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 1.05 }}
+                    className="h-full"
+                  >
+                    <CameraView onDetection={handleDetection} onBack={() => setActiveTab('home')} />
+                  </motion.div>
+                )}
+
+                {activeTab === 'report' && (
+                  <motion.div 
+                    key="report"
+                    initial={{ opacity: 0, y: 100 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 100 }}
+                    className="h-full"
+                  >
+                    <ReportView 
+                      onBack={() => setActiveTab('home')} 
+                      onSubmit={(data) => handleReportPothole(data)} 
+                    />
+                  </motion.div>
+                )}
+
                 {activeTab === 'profile' && (
-                  <motion.div key="profile" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="absolute inset-0 bg-zinc-950 p-6 flex flex-col items-center overflow-y-auto">
-                    <div className="w-full max-w-sm flex flex-col items-center pt-12">
-                      <div className="relative mb-6">
-                        <img src={user.photoURL || `https://ui-avatars.com/api/?name=${user.email}`} className="w-24 h-24 rounded-full border-4 border-red-600 shadow-2xl" alt="Profile" />
-                        <div className="absolute -bottom-2 -right-2 bg-red-600 p-2 rounded-full shadow-lg">
-                          <ShieldCheck className="w-4 h-4 text-white" />
+                  <motion.div 
+                    key="profile"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    className="h-full bg-white flex flex-col"
+                  >
+                    <header className="bg-[#1a365d] text-white p-8 pb-20 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full -mr-20 -mt-20 blur-3xl" />
+                      <div className="flex justify-between items-start mb-6">
+                        <h1 className="text-2xl font-bold tracking-tight">My Profile</h1>
+                        <button className="p-2 bg-white/10 rounded-full">
+                          <Settings className="w-5 h-5" />
+                        </button>
+                      </div>
+                      
+                      <div className="flex items-center gap-4">
+                        <div className="w-20 h-20 rounded-3xl border-4 border-white/20 overflow-hidden shadow-2xl">
+                          <img 
+                            src={user.photoURL || `https://ui-avatars.com/api/?name=${user.email}`} 
+                            className="w-full h-full object-cover"
+                            alt="Profile"
+                          />
+                        </div>
+                        <div>
+                          <h2 className="text-xl font-bold">{user.displayName || 'Road Guardian'}</h2>
+                          <p className="text-blue-100/60 text-xs font-medium">{user.email}</p>
+                          <div className="mt-2 flex items-center gap-2 bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider">
+                            <Award className="w-3 h-3" />
+                            Elite Reporter
+                          </div>
                         </div>
                       </div>
-                      <h3 className="text-2xl font-bold mb-1">{user.displayName || 'Road Guardian'}</h3>
-                      <p className="text-zinc-500 text-sm mb-8">{user.email}</p>
-                      
-                      <div className="grid grid-cols-2 gap-4 w-full mb-8">
-                        <div className="bg-zinc-900 p-4 rounded-2xl border border-zinc-800">
-                          <p className="text-[10px] font-bold text-zinc-500 uppercase mb-1">Reports</p>
-                          <p className="text-2xl font-black text-red-500">{potholes.filter(p => p.userId === user.uid).length}</p>
+                    </header>
+
+                    <div className="flex-1 p-6 -mt-12 bg-white rounded-t-[40px] shadow-2xl space-y-8 overflow-y-auto">
+                      {/* Stats Cards */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-[#f7fafc] p-5 rounded-3xl border border-[#e2e8f0] flex flex-col items-center text-center">
+                          <p className="text-3xl font-black text-[#1a365d] mb-1">{potholes.filter(p => p.userId === user.uid).length}</p>
+                          <p className="text-[10px] font-bold text-[#718096] uppercase tracking-widest">Reports</p>
                         </div>
-                        <div className="bg-zinc-900 p-4 rounded-2xl border border-zinc-800">
-                          <p className="text-[10px] font-bold text-zinc-500 uppercase mb-1">Points</p>
-                          <p className="text-2xl font-black text-emerald-500">{potholes.filter(p => p.userId === user.uid).length * 10}</p>
+                        <div className="bg-[#f7fafc] p-5 rounded-3xl border border-[#e2e8f0] flex flex-col items-center text-center">
+                          <p className="text-3xl font-black text-[#1a365d] mb-1">{potholes.filter(p => p.userId === user.uid).length * 50}</p>
+                          <p className="text-[10px] font-bold text-[#718096] uppercase tracking-widest">Points</p>
                         </div>
                       </div>
 
-                      <div className="space-y-3 w-full">
-                        <button className="w-full py-4 bg-zinc-900 rounded-2xl border border-zinc-800 flex items-center justify-between px-6 hover:bg-zinc-800 transition-all">
-                          <div className="flex items-center gap-3">
-                            <Settings className="w-5 h-5 text-zinc-400" />
-                            <span className="font-bold">Account Settings</span>
-                          </div>
-                          <ArrowLeft className="w-4 h-4 rotate-180 text-zinc-600" />
-                        </button>
-                        <button className="w-full py-4 bg-zinc-900 rounded-2xl border border-zinc-800 flex items-center justify-between px-6 hover:bg-zinc-800 transition-all">
-                          <div className="flex items-center gap-3">
-                            <Activity className="w-5 h-5 text-zinc-400" />
-                            <span className="font-bold">My Activity</span>
-                          </div>
-                          <ArrowLeft className="w-4 h-4 rotate-180 text-zinc-600" />
-                        </button>
-                        <button onClick={handleLogout} className="w-full py-4 bg-red-600/10 text-red-500 rounded-2xl border border-red-600/20 flex items-center justify-center gap-3 font-bold hover:bg-red-600/20 transition-all mt-4">
-                          <LogOut className="w-5 h-5" />
-                          Sign Out
-                        </button>
-                      </div>
+                      {/* Menu Sections */}
+                      <section className="space-y-4">
+                        <h3 className="text-xs font-black text-[#a0aec0] uppercase tracking-[0.2em] px-2">Account Settings</h3>
+                        <div className="space-y-2">
+                          <ProfileMenuItem icon={<Bell className="w-5 h-5" />} label="Notifications" />
+                          <ProfileMenuItem icon={<Shield className="w-5 h-5" />} label="Privacy & Security" />
+                          <ProfileMenuItem icon={<Award className="w-5 h-5" />} label="My Achievements" />
+                          {userRole === 'admin' && (
+                            <button 
+                              onClick={() => navigate('/admin')}
+                              className="w-full flex items-center justify-between p-4 bg-emerald-50 text-emerald-600 rounded-2xl font-bold hover:bg-emerald-100 transition-all"
+                            >
+                              <div className="flex items-center gap-3">
+                                <ShieldCheck className="w-5 h-5" />
+                                <span>Admin Console</span>
+                              </div>
+                              <ChevronRight className="w-4 h-4 opacity-50" />
+                            </button>
+                          )}
+                        </div>
+                      </section>
+
+                      <section className="space-y-4">
+                        <h3 className="text-xs font-black text-[#a0aec0] uppercase tracking-[0.2em] px-2">Support</h3>
+                        <div className="space-y-2">
+                          <ProfileMenuItem icon={<InfoIcon className="w-5 h-5" />} label="Help Center" />
+                          <button 
+                            onClick={handleLogout}
+                            className="w-full flex items-center justify-between p-4 bg-red-50 text-red-600 rounded-2xl font-bold hover:bg-red-100 transition-all"
+                          >
+                            <div className="flex items-center gap-3">
+                              <LogOut className="w-5 h-5" />
+                              <span>Sign Out</span>
+                            </div>
+                            <ChevronRight className="w-4 h-4 opacity-50" />
+                          </button>
+                        </div>
+                      </section>
                     </div>
                   </motion.div>
                 )}
               </AnimatePresence>
-            </main>
+            </div>
+          </main>
 
-            {/* Bottom Navigation */}
-            <nav className="h-20 bg-black/80 backdrop-blur-2xl border-t border-zinc-800 px-6 flex items-center justify-between pb-2 z-50">
-              <NavButton active={activeTab === 'map'} onClick={() => setActiveTab('map')} icon={<MapIcon className="w-6 h-6" />} label="Map" />
-              <NavButton active={activeTab === 'history'} onClick={() => setActiveTab('history')} icon={<History className="w-6 h-6" />} label="History" />
+            {/* Bottom Navigation (Mobile Only) */}
+            <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-[#e2e8f0] px-6 py-3 flex justify-between items-center z-50 shadow-[0_-10px_20px_-5px_rgba(0,0,0,0.05)]">
+              <NavButton 
+                active={activeTab === 'home'} 
+                onClick={() => setActiveTab('home')} 
+                icon={<HomeIcon className="w-6 h-6" />} 
+                label="Home" 
+              />
+              <NavButton 
+                active={activeTab === 'map'} 
+                onClick={() => setActiveTab('map')} 
+                icon={<MapIcon className="w-6 h-6" />} 
+                label="Map" 
+              />
               
-              {/* Center Scan Button */}
-              <div className="relative -top-6">
+              {/* Central Scan Button */}
+              <div className="relative -mt-12">
                 <button 
                   onClick={() => setActiveTab('scan')}
-                  className={`w-16 h-16 rounded-full flex items-center justify-center shadow-2xl transition-all duration-300 ${
-                    activeTab === 'scan' ? 'bg-white text-black scale-110' : 'bg-red-600 text-white hover:scale-105'
+                  className={`w-16 h-16 rounded-full flex items-center justify-center shadow-2xl transition-all active:scale-90 ${
+                    activeTab === 'scan' ? 'bg-[#1a365d] text-white' : 'bg-[#1a365d] text-white'
                   }`}
                 >
                   <Scan className="w-8 h-8" />
                 </button>
+                <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] font-bold text-[#1a365d] uppercase tracking-widest">Scan</span>
               </div>
 
-              <NavButton active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} icon={<UserIcon className="w-6 h-6" />} label="Profile" />
-              <NavButton active={false} onClick={() => alert("More features coming soon!")} icon={<Settings className="w-6 h-6" />} label="More" />
+              <NavButton 
+                active={activeTab === 'history'} 
+                onClick={() => setActiveTab('history')} 
+                icon={<History className="w-6 h-6" />} 
+                label="History" 
+              />
+              <NavButton 
+                active={activeTab === 'profile'} 
+                onClick={() => setActiveTab('profile')} 
+                icon={<UserIcon className="w-6 h-6" />} 
+                label="Profile" 
+              />
             </nav>
           </div>
         )
@@ -325,11 +567,63 @@ export default function App() {
 
 function NavButton({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string }) {
   return (
-    <button onClick={onClick} className={`flex flex-col items-center gap-1 transition-all ${active ? 'text-red-500' : 'text-zinc-500 hover:text-zinc-300'}`}>
+    <button 
+      onClick={onClick}
+      className={`flex flex-col items-center gap-1 transition-all ${
+        active ? 'text-[#1a365d]' : 'text-[#a0aec0] hover:text-[#718096]'
+      }`}
+    >
       {icon}
-      <span className="text-[10px] font-bold uppercase tracking-tighter">{label}</span>
-      {active && <motion.div layoutId="nav-dot" className="w-1 h-1 bg-red-500 rounded-full mt-0.5" />}
+      <span className="text-[10px] font-bold uppercase tracking-widest">{label}</span>
+      {active && <motion.div layoutId="nav-dot" className="w-1 h-1 bg-[#1a365d] rounded-full" />}
     </button>
+  );
+}
+
+function SidebarButton({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string }) {
+  return (
+    <button 
+      onClick={onClick}
+      className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all font-bold text-sm ${
+        active ? 'bg-white text-[#1a365d] shadow-lg' : 'text-blue-100/70 hover:bg-white/5 hover:text-white'
+      }`}
+    >
+      {icon}
+      <span>{label}</span>
+      {active && <motion.div layoutId="sidebar-active" className="ml-auto w-1.5 h-1.5 bg-[#1a365d] rounded-full" />}
+    </button>
+  );
+}
+
+function ProfileMenuItem({ icon, label }: { icon: React.ReactNode; label: string }) {
+  return (
+    <button className="w-full flex items-center justify-between p-4 bg-[#f7fafc] hover:bg-[#edf2f7] rounded-2xl transition-all group">
+      <div className="flex items-center gap-3 text-[#4a5568]">
+        <div className="text-[#1a365d]">{icon}</div>
+        <span className="font-bold text-sm">{label}</span>
+      </div>
+      <ChevronRight className="w-4 h-4 text-[#cbd5e0] group-hover:text-[#4a5568] transition-all" />
+    </button>
+  );
+}
+
+function InfoIcon({ className }: { className?: string }) {
+  return (
+    <svg 
+      className={className} 
+      xmlns="http://www.w3.org/2000/svg" 
+      width="24" height="24" 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      stroke="currentColor" 
+      strokeWidth="2" 
+      strokeLinecap="round" 
+      strokeLinejoin="round"
+    >
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 16v-4" />
+      <path d="M12 8h.01" />
+    </svg>
   );
 }
 

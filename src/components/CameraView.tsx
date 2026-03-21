@@ -2,14 +2,15 @@ import React, { useRef, useEffect, useState } from 'react';
 import { loadModel, detectPotholes, Detection } from '../services/detectionService';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../firebase';
-import { Camera, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { Camera, AlertTriangle, ShieldCheck, ArrowLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface CameraViewProps {
   onDetection: (detection: Detection) => void;
+  onBack: () => void;
 }
 
-export default function CameraView({ onDetection }: CameraViewProps) {
+export default function CameraView({ onDetection, onBack }: CameraViewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isModelLoading, setIsModelLoading] = useState(true);
@@ -89,27 +90,7 @@ export default function CameraView({ onDetection }: CameraViewProps) {
 
   const handlePotholeDetected = async (detection: Detection) => {
     if (!auth.currentUser) return;
-
-    // Get GPS location
-    navigator.geolocation.getCurrentPosition(async (position) => {
-      const { latitude, longitude } = position.coords;
-      
-      try {
-        await addDoc(collection(db, 'potholes'), {
-          latitude,
-          longitude,
-          timestamp: serverTimestamp(),
-          severity: detection.score > 0.8 ? 'high' : 'medium',
-          status: 'reported',
-          userId: auth.currentUser?.uid,
-          userName: auth.currentUser?.displayName || auth.currentUser?.email || 'Anonymous',
-          class: detection.class
-        });
-        onDetection(detection);
-      } catch (error) {
-        console.error("Error saving pothole:", error);
-      }
-    });
+    onDetection(detection);
   };
 
   return (
@@ -172,7 +153,13 @@ export default function CameraView({ onDetection }: CameraViewProps) {
         )}
       </AnimatePresence>
 
-      <div className="absolute top-4 right-4 z-10">
+      <div className="absolute top-4 right-4 z-10 flex gap-2">
+        <button 
+          onClick={onBack}
+          className="p-3 bg-black/40 hover:bg-black/60 backdrop-blur-md rounded-full transition-colors border border-white/20"
+        >
+          <ArrowLeft className="w-5 h-5 text-white" />
+        </button>
         <button 
           onClick={() => setIsDetecting(!isDetecting)}
           className="p-3 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-full transition-colors border border-white/20"

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pothole } from '../hooks/usePotholes';
-import { MapPin, Clock, ChevronRight, AlertCircle } from 'lucide-react';
+import { MapPin, Clock, ChevronRight, AlertTriangle, Info } from 'lucide-react';
+import { motion } from 'motion/react';
 
 interface PotholeListProps {
   potholes: Pothole[];
@@ -8,104 +9,105 @@ interface PotholeListProps {
 
 export default function PotholeList({ potholes }: PotholeListProps) {
   return (
-    <div className="flex flex-col h-full bg-zinc-900/50 backdrop-blur-sm rounded-2xl border border-zinc-800 overflow-hidden">
-      <div className="p-4 border-bottom border-zinc-800 flex items-center justify-between bg-zinc-900">
-        <h3 className="font-bold text-white flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-red-500" />
-          Recent Detections
-        </h3>
-        <span className="text-xs text-zinc-500 bg-zinc-800 px-2 py-1 rounded-full">
-          {potholes.length} total
-        </span>
-      </div>
-      
-      <div className="flex-1 overflow-y-auto p-2 space-y-2">
+    <div className="flex flex-col h-full bg-white">
+      {/* Header */}
+      <header className="bg-[#1a365d] text-white p-6 shadow-lg z-10">
+        <h1 className="text-xl font-bold tracking-tight">Report History</h1>
+      </header>
+
+      {/* List */}
+      <div className="flex-1 overflow-y-auto p-4 md:p-8">
         {potholes.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-zinc-600 py-12">
-            <MapPin className="w-8 h-8 mb-2 opacity-20" />
-            <p className="text-sm italic">No potholes detected yet</p>
+          <div className="flex flex-col items-center justify-center h-full text-[#a0aec0] py-24">
+            <MapPin className="w-16 h-16 mb-6 opacity-20" />
+            <p className="font-black text-xl italic uppercase tracking-tighter">No reports found</p>
+            <p className="text-sm mt-2">Your reported potholes will appear here</p>
           </div>
         ) : (
-          potholes.map((p) => (
-            <div 
-              key={p.id}
-              className="group flex items-center gap-4 p-3 bg-zinc-800/40 hover:bg-zinc-800/80 rounded-xl border border-zinc-700/50 transition-all cursor-pointer"
-            >
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
-                p.severity === 'high' ? 'bg-red-500/20 text-red-500' : 
-                p.severity === 'medium' ? 'bg-orange-500/20 text-orange-500' : 'bg-yellow-500/20 text-yellow-500'
-              }`}>
-                <MapPin className="w-5 h-5" />
-              </div>
-              
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between mb-0.5">
-                  <span className="font-bold text-zinc-100 text-sm truncate">
-                    {p.address || `Pothole at ${p.latitude.toFixed(4)}, ${p.longitude.toFixed(4)}`}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <span className={`text-[10px] font-black uppercase px-1.5 py-0.5 rounded ${
-                      p.severity === 'high' ? 'bg-red-500 text-white' : 
-                      p.severity === 'medium' ? 'bg-orange-500 text-white' : 'bg-yellow-500 text-black'
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+            {potholes.map((p) => (
+              <div 
+                key={p.id}
+                className="bg-white rounded-3xl border-2 border-[#e2e8f0] p-6 shadow-sm hover:shadow-xl hover:border-[#1a365d]/20 transition-all cursor-pointer flex flex-col gap-6 group relative overflow-hidden"
+              >
+                <div className="flex items-start justify-between">
+                  <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shrink-0 shadow-inner ${
+                    p.severity === 'high' ? 'bg-red-50 text-red-600' : 
+                    p.severity === 'medium' ? 'bg-orange-50 text-orange-600' : 'bg-yellow-50 text-yellow-600'
+                  }`}>
+                    {p.severity === 'high' ? <AlertTriangle className="w-8 h-8" /> : 
+                     p.severity === 'medium' ? <Info className="w-8 h-8" /> : <MapPin className="w-8 h-8" />}
+                  </div>
+                  
+                  <div className="flex flex-col items-end gap-2">
+                    <span className={`text-[10px] font-black uppercase px-3 py-1 rounded-full tracking-widest ${
+                      p.severity === 'high' ? 'bg-red-600 text-white' : 
+                      p.severity === 'medium' ? 'bg-orange-600 text-white' : 'bg-yellow-600 text-white'
                     }`}>
                       {p.severity}
                     </span>
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#a0aec0] uppercase tracking-widest">
+                      <Clock className="w-3 h-3" />
+                      <span>{new Date(p.timestamp?.seconds * 1000).toLocaleDateString()}</span>
+                    </div>
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-3 text-[10px] text-zinc-500 mb-2">
-                  <div className="flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    <span>{new Date(p.timestamp?.seconds * 1000).toLocaleTimeString()}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <User className="w-3 h-3" />
-                    <span>{p.userName || 'Anonymous'}</span>
-                  </div>
+                <div className="space-y-2">
+                  <h3 className="font-black text-[#1a365d] text-lg leading-tight tracking-tighter italic uppercase">
+                    {p.address || `Pothole at ${p.latitude.toFixed(4)}, ${p.longitude.toFixed(4)}`}
+                  </h3>
+                  <p className="text-xs text-[#718096] font-medium">Reported by {p.userName || 'Anonymous'}</p>
                 </div>
 
-                {/* Progress Bar */}
-                <div className="space-y-1.5">
-                  <div className="flex justify-between items-center text-[8px] font-black uppercase tracking-widest text-zinc-600">
-                    <span>Status: {p.status}</span>
-                    <span>{p.status === 'resolved' ? '100%' : p.status === 'fixing' ? '66%' : p.status === 'verified' ? '33%' : '10%'}</span>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full animate-pulse ${
+                        p.status === 'resolved' ? 'bg-emerald-500' : 
+                        p.status === 'fixing' ? 'bg-blue-500' : 
+                        p.status === 'verified' ? 'bg-purple-500' : 'bg-zinc-400'
+                      }`} />
+                      <span className={
+                        p.status === 'resolved' ? 'text-emerald-600' : 
+                        p.status === 'fixing' ? 'text-blue-600' : 
+                        p.status === 'verified' ? 'text-purple-600' : 'text-zinc-500'
+                      }>{p.status}</span>
+                    </div>
+                    <span className="text-[#a0aec0]">
+                      {p.status === 'resolved' ? '100%' : 
+                       p.status === 'fixing' ? '66%' : 
+                       p.status === 'verified' ? '33%' : '10%'}
+                    </span>
                   </div>
-                  <div className="h-1 w-full bg-zinc-800 rounded-full overflow-hidden">
-                    <div 
-                      className={`h-full transition-all duration-500 ${
-                        p.status === 'resolved' ? 'bg-emerald-500 w-full' : 
-                        p.status === 'fixing' ? 'bg-blue-500 w-2/3' : 
-                        p.status === 'verified' ? 'bg-purple-500 w-1/3' : 'bg-zinc-600 w-[10%]'
+                  
+                  <div className="h-2 w-full bg-[#edf2f7] rounded-full overflow-hidden shadow-inner">
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ 
+                        width: p.status === 'resolved' ? '100%' : 
+                               p.status === 'fixing' ? '66%' : 
+                               p.status === 'verified' ? '33%' : '10%' 
+                      }}
+                      className={`h-full transition-all duration-1000 ${
+                        p.status === 'resolved' ? 'bg-emerald-500' : 
+                        p.status === 'fixing' ? 'bg-blue-500' : 
+                        p.status === 'verified' ? 'bg-purple-500' : 'bg-zinc-400'
                       }`}
                     />
                   </div>
                 </div>
+
+                <div className="absolute bottom-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="w-10 h-10 bg-[#1a365d] text-white rounded-xl flex items-center justify-center shadow-lg">
+                    <ChevronRight className="w-5 h-5" />
+                  </div>
+                </div>
               </div>
-              
-              <ChevronRight className="w-4 h-4 text-zinc-700 group-hover:text-zinc-400 transition-colors" />
-            </div>
-          ))
+            ))}
+          </div>
         )}
       </div>
     </div>
-  );
-}
-
-function User({ className }: { className?: string }) {
-  return (
-    <svg 
-      className={className} 
-      xmlns="http://www.w3.org/2000/svg" 
-      width="24" height="24" 
-      viewBox="0 0 24 24" 
-      fill="none" 
-      stroke="currentColor" 
-      strokeWidth="2" 
-      strokeLinecap="round" 
-      strokeLinejoin="round"
-    >
-      <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-      <circle cx="12" cy="7" r="4" />
-    </svg>
   );
 }
