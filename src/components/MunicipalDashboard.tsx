@@ -54,7 +54,7 @@ export default function MunicipalDashboard({ potholes }: MunicipalDashboardProps
       clearSelection();
     } catch (error) {
       console.error("Error updating status:", error);
-      alert("Failed to update status. Please try again.");
+      // We could add an error state here if needed, but for now we'll just log it
     } finally {
       setUpdatingId(null);
     }

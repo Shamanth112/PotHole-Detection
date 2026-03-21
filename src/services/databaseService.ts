@@ -1,4 +1,20 @@
-import { supabase } from '../supabase';
+import { 
+  collection, 
+  doc, 
+  getDoc, 
+  getDocs, 
+  setDoc, 
+  updateDoc, 
+  deleteDoc, 
+  query, 
+  where, 
+  orderBy, 
+  onSnapshot,
+  Timestamp,
+  addDoc,
+  serverTimestamp
+} from 'firebase/firestore';
+import { db, auth } from '../firebase';
 
 export interface Pothole {
   id: string;
@@ -28,148 +44,238 @@ export interface PermittedUser {
   role: 'user' | 'admin' | 'municipal';
 }
 
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId: string | undefined;
+    email: string | null | undefined;
+    emailVerified: boolean | undefined;
+    isAnonymous: boolean | undefined;
+    tenantId: string | null | undefined;
+    providerInfo: {
+      providerId: string;
+      displayName: string | null;
+      email: string | null;
+      photoUrl: string | null;
+    }[];
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData.map(provider => ({
+        providerId: provider.providerId,
+        displayName: provider.displayName,
+        email: provider.email,
+        photoUrl: provider.photoURL
+      })) || []
+    },
+    operationType,
+    path
+  }
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
+
 export const dbService = {
   // Potholes
   async getPotholes() {
-    const { data, error } = await supabase
-      .from('potholes')
-      .select('*')
-      .order('timestamp', { ascending: false });
-    if (error) throw error;
-    return data as Pothole[];
+    const path = 'potholes';
+    try {
+      const q = query(collection(db, path), orderBy('timestamp', 'desc'));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Pothole));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
+    }
   },
 
   async getPotholesByUser(userId: string) {
-    const { data, error } = await supabase
-      .from('potholes')
-      .select('*')
-      .eq('userId', userId)
-      .order('timestamp', { ascending: false });
-    if (error) throw error;
-    return data as Pothole[];
+    const path = 'potholes';
+    try {
+      const q = query(collection(db, path), where('userId', '==', userId), orderBy('timestamp', 'desc'));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Pothole));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
+    }
   },
 
   async addPothole(pothole: Omit<Pothole, 'id'>) {
-    const { data, error } = await supabase
-      .from('potholes')
-      .insert([pothole])
-      .select()
-      .single();
-    if (error) throw error;
-    return data as Pothole;
+    const path = 'potholes';
+    try {
+      const docRef = await addDoc(collection(db, path), {
+        ...pothole,
+        timestamp: pothole.timestamp || new Date().toISOString()
+      });
+      return { id: docRef.id, ...pothole } as Pothole;
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, path);
+      throw error;
+    }
   },
 
   async updatePothole(id: string, updates: Partial<Pothole>) {
-    const { data, error } = await supabase
-      .from('potholes')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single();
-    if (error) throw error;
-    return data as Pothole;
+    const path = `potholes/${id}`;
+    try {
+      const docRef = doc(db, 'potholes', id);
+      await updateDoc(docRef, updates);
+      const updatedDoc = await getDoc(docRef);
+      return { id: updatedDoc.id, ...updatedDoc.data() } as Pothole;
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, path);
+      throw error;
+    }
   },
 
   async deletePothole(id: string) {
-    const { error } = await supabase
-      .from('potholes')
-      .delete()
-      .eq('id', id);
-    if (error) throw error;
+    const path = `potholes/${id}`;
+    try {
+      await deleteDoc(doc(db, 'potholes', id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, path);
+      throw error;
+    }
   },
 
   // Users
   async getUserProfile(uid: string) {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('uid', uid)
-      .maybeSingle();
-    if (error) throw error;
-    return data as UserProfile | null;
+    const path = `users/${uid}`;
+    try {
+      const docRef = doc(db, 'users', uid);
+      const snapshot = await getDoc(docRef);
+      if (!snapshot.exists()) return null;
+      return snapshot.data() as UserProfile;
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, path);
+      return null;
+    }
   },
 
   async upsertUserProfile(profile: UserProfile) {
-    const { data, error } = await supabase
-      .from('users')
-      .upsert([profile], { onConflict: 'uid' })
-      .select()
-      .single();
-    if (error) throw error;
-    return data as UserProfile;
+    const path = `users/${profile.uid}`;
+    try {
+      const docRef = doc(db, 'users', profile.uid);
+      await setDoc(docRef, profile, { merge: true });
+      return profile;
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, path);
+      throw error;
+    }
   },
 
   async getAllUsers() {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*');
-    if (error) throw error;
-    return data as UserProfile[];
+    const path = 'users';
+    try {
+      const snapshot = await getDocs(collection(db, path));
+      return snapshot.docs.map(doc => doc.data() as UserProfile);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
+    }
   },
 
   async deleteUser(uid: string) {
-    const { error } = await supabase
-      .from('users')
-      .delete()
-      .eq('uid', uid);
-    if (error) throw error;
+    const path = `users/${uid}`;
+    try {
+      await deleteDoc(doc(db, 'users', uid));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, path);
+      throw error;
+    }
   },
 
   // Permitted Users
   async getPermittedUser(email: string) {
-    const { data, error } = await supabase
-      .from('permitted_users')
-      .select('*')
-      .eq('email', email.toLowerCase())
-      .maybeSingle();
-    if (error) throw error;
-    return data as PermittedUser | null;
+    const emailKey = email.toLowerCase().trim();
+    const path = `permitted_users/${emailKey}`;
+    try {
+      const docRef = doc(db, 'permitted_users', emailKey);
+      const snapshot = await getDoc(docRef);
+      if (!snapshot.exists()) return null;
+      return snapshot.data() as PermittedUser;
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, path);
+      return null;
+    }
   },
 
   async getAllPermittedUsers() {
-    const { data, error } = await supabase
-      .from('permitted_users')
-      .select('*');
-    if (error) throw error;
-    return data as PermittedUser[];
+    const path = 'permitted_users';
+    try {
+      const snapshot = await getDocs(collection(db, path));
+      return snapshot.docs.map(doc => doc.data() as PermittedUser);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
+    }
   },
 
   async addPermittedUser(permitted: PermittedUser) {
-    const { data, error } = await supabase
-      .from('permitted_users')
-      .insert([{ ...permitted, email: permitted.email.toLowerCase() }])
-      .select()
-      .single();
-    if (error) throw error;
-    return data as PermittedUser;
+    const emailKey = permitted.email.toLowerCase().trim();
+    const path = `permitted_users/${emailKey}`;
+    try {
+      await setDoc(doc(db, 'permitted_users', emailKey), {
+        ...permitted,
+        email: emailKey
+      });
+      return permitted;
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, path);
+      throw error;
+    }
   },
 
   async deletePermittedUser(email: string) {
-    const { error } = await supabase
-      .from('permitted_users')
-      .delete()
-      .eq('email', email.toLowerCase());
-    if (error) throw error;
+    const emailKey = email.toLowerCase().trim();
+    const path = `permitted_users/${emailKey}`;
+    try {
+      await deleteDoc(doc(db, 'permitted_users', emailKey));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, path);
+      throw error;
+    }
   },
 
   // Real-time subscriptions
   subscribeToPotholes(callback: (potholes: Pothole[]) => void) {
-    return supabase
-      .channel('public:potholes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'potholes' }, async () => {
-        const potholes = await this.getPotholes();
-        callback(potholes);
-      })
-      .subscribe();
+    const path = 'potholes';
+    const q = query(collection(db, path), orderBy('timestamp', 'desc'));
+    return onSnapshot(q, (snapshot) => {
+      const potholes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Pothole));
+      callback(potholes);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, path);
+    });
   },
 
   subscribeToPermittedUsers(callback: (users: PermittedUser[]) => void) {
-    return supabase
-      .channel('public:permitted_users')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'permitted_users' }, async () => {
-        const users = await this.getAllPermittedUsers();
-        callback(users);
-      })
-      .subscribe();
+    const path = 'permitted_users';
+    return onSnapshot(collection(db, path), (snapshot) => {
+      const users = snapshot.docs.map(doc => doc.data() as PermittedUser);
+      callback(users);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, path);
+    });
   }
 };

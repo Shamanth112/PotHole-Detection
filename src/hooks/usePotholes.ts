@@ -63,7 +63,7 @@ export function usePotholes() {
     });
 
     return () => {
-      subscription.unsubscribe();
+      subscription();
     };
   }, [userState]);
 

@@ -56,8 +56,8 @@ export default function AdminDashboard() {
     const permittedSub = dbService.subscribeToPermittedUsers(setPermittedUsers);
 
     return () => {
-      potholeSub.unsubscribe();
-      permittedSub.unsubscribe();
+      potholeSub();
+      permittedSub();
     };
   }, []);
 
@@ -94,28 +94,51 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleDeletePermittedUser = async (email: string) => {
-    if (!window.confirm(`Remove permissions for ${email}?`)) return;
-    try {
-      await dbService.deletePermittedUser(email);
-      setSuccess(`Permissions removed for ${email}.`);
-    } catch (err: any) {
-      console.error("Error deleting permitted user:", err);
-    }
+  const [confirmModal, setConfirmModal] = useState<{
+    show: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({ show: false, title: '', message: '', onConfirm: () => {} });
+
+  const handleDeletePermittedUser = (email: string) => {
+    setConfirmModal({
+      show: true,
+      title: 'Remove Permissions',
+      message: `Are you sure you want to remove permissions for ${email}?`,
+      onConfirm: async () => {
+        try {
+          await dbService.deletePermittedUser(email);
+          setSuccess(`Permissions removed for ${email}.`);
+        } catch (err: any) {
+          console.error("Error deleting permitted user:", err);
+          setError("Failed to remove permissions.");
+        }
+        setConfirmModal(prev => ({ ...prev, show: false }));
+      }
+    });
   };
 
-  const handleDeleteUser = async (user: UserProfile) => {
-    if (!window.confirm(`Are you sure you want to delete ${user.email} from registered users?`)) return;
-    setDeletingId(user.uid);
-    try {
-      await dbService.deleteUser(user.uid);
-      setSuccess(`User ${user.email} deleted.`);
-      fetchUsers();
-    } catch (err: any) {
-      console.error("Error deleting user:", err);
-    } finally {
-      setDeletingId(null);
-    }
+  const handleDeleteUser = (user: UserProfile) => {
+    setConfirmModal({
+      show: true,
+      title: 'Delete User',
+      message: `Are you sure you want to delete ${user.email} from registered users? This action cannot be undone.`,
+      onConfirm: async () => {
+        setDeletingId(user.uid);
+        try {
+          await dbService.deleteUser(user.uid);
+          setSuccess(`User ${user.email} deleted.`);
+          fetchUsers();
+        } catch (err: any) {
+          console.error("Error deleting user:", err);
+          setError("Failed to delete user.");
+        } finally {
+          setDeletingId(null);
+          setConfirmModal(prev => ({ ...prev, show: false }));
+        }
+      }
+    });
   };
 
   const handleAddPothole = async (e: React.FormEvent) => {
@@ -142,14 +165,22 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleDeletePothole = async (id: string) => {
-    if (!window.confirm('Delete this pothole report permanently?')) return;
-    try {
-      await dbService.deletePothole(id);
-      setSuccess('Pothole report removed.');
-    } catch (err: any) {
-      console.error("Error deleting pothole:", err);
-    }
+  const handleDeletePothole = (id: string) => {
+    setConfirmModal({
+      show: true,
+      title: 'Delete Pothole Report',
+      message: 'Are you sure you want to delete this pothole report permanently?',
+      onConfirm: async () => {
+        try {
+          await dbService.deletePothole(id);
+          setSuccess('Pothole report removed.');
+        } catch (err: any) {
+          console.error("Error deleting pothole:", err);
+          setError("Failed to delete pothole report.");
+        }
+        setConfirmModal(prev => ({ ...prev, show: false }));
+      }
+    });
   };
 
   const stats = {
@@ -513,6 +544,36 @@ export default function AdminDashboard() {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      {/* Confirmation Modal */}
+      <AnimatePresence>
+        {confirmModal.show && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8 max-w-md w-full shadow-2xl"
+            >
+              <h3 className="text-xl font-black uppercase italic mb-4">{confirmModal.title}</h3>
+              <p className="text-zinc-400 mb-8">{confirmModal.message}</p>
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setConfirmModal(prev => ({ ...prev, show: false }))}
+                  className="flex-1 py-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl font-bold transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmModal.onConfirm}
+                  className="flex-1 py-3 bg-red-600 hover:bg-red-500 rounded-xl font-bold transition-all"
+                >
+                  Confirm
+                </button>
+              </div>
             </motion.div>
           </div>
         )}
