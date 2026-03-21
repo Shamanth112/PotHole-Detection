@@ -298,17 +298,6 @@ export default function App() {
                 By continuing, you agree to our Terms & Privacy Policy
               </p>
 
-              {/* Debug Info for Setup */}
-              <div className="pt-8 border-t border-white/10 mt-8 text-left">
-                <p className="text-[9px] font-bold text-white/30 uppercase tracking-widest mb-2">Debug Setup Info</p>
-                <div className="space-y-1 font-mono text-[8px] text-white/20">
-                  <p>Project ID: {auth.app.options.projectId}</p>
-                  <p>Auth Domain: {auth.app.options.authDomain}</p>
-                  <p>Current Domain: {window.location.hostname}</p>
-                  <p>Supabase URL: {import.meta.env.VITE_SUPABASE_URL ? 'Configured' : 'MISSING'}</p>
-                  <p>Supabase Key: {import.meta.env.VITE_SUPABASE_ANON_KEY ? 'Configured' : 'MISSING'}</p>
-                </div>
-              </div>
             </motion.div>
           </div>
         ) : (
