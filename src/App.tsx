@@ -171,12 +171,14 @@ export default function App() {
   };
 
   const handleDetection = (detection: any) => {
-    // For demo, we'll just report it
+    if (!userLocation) return;
+    
+    // Auto-report to municipal
     handleReportPothole({
-      latitude: (userLocation?.lat || 40.7128) + (Math.random() - 0.5) * 0.001,
-      longitude: (userLocation?.lng || -74.0060) + (Math.random() - 0.5) * 0.001,
-      severity: 'medium',
-      address: 'Detected via AI Camera'
+      latitude: userLocation.lat,
+      longitude: userLocation.lng,
+      severity: detection.score > 0.8 ? 'high' : 'medium',
+      address: 'AI Detected - Road Focus Active'
     });
   };
 

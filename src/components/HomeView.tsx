@@ -46,8 +46,8 @@ export default function HomeView({ onStartDetection, onReportManually, stats }: 
             </motion.div>
             
             <div className="mt-8 text-center space-y-2">
-              <p className="text-zinc-400 font-black text-xl tracking-tighter italic uppercase">AI Vision Ready</p>
-              <p className="text-zinc-600 text-xs font-medium tracking-widest uppercase">Connect camera to begin scanning</p>
+              <p className="text-zinc-400 font-black text-xl tracking-tighter italic uppercase">Road Focus AI Ready</p>
+              <p className="text-zinc-600 text-xs font-medium tracking-widest uppercase">Optimized for Pothole Detection</p>
             </div>
 
             <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />

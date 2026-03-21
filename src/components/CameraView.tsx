@@ -48,7 +48,14 @@ export default function CameraView({ onDetection, onBack }: CameraViewProps) {
         setDetections(results);
         
         // Filter for potholes (mocked as 'pothole' in service)
-        const potholes = results.filter(d => d.class === 'pothole' && d.score > 0.6);
+        // Focus on the road by only considering detections in the lower 60% of the screen
+        const potholes = results.filter(d => {
+          const isPothole = d.class === 'pothole' && d.score > 0.6;
+          const [x, y, width, height] = d.bbox;
+          const videoHeight = videoRef.current?.videoHeight || 1;
+          const isOnRoad = (y + height / 2) > (videoHeight * 0.4); // Lower 60%
+          return isPothole && isOnRoad;
+        });
         
         if (potholes.length > 0) {
           const now = Date.now();
