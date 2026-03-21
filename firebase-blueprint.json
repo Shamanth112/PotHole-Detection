@@ -10,7 +10,8 @@
         "longitude": { "type": "number" },
         "timestamp": { "type": "string", "format": "date-time" },
         "severity": { "type": "string", "enum": ["low", "medium", "high"] },
-        "imageUrl": { "type": "string" },
+        "reportImageUrl": { "type": "string" },
+        "resolvedImageUrl": { "type": "string" },
         "userId": { "type": "string" },
         "address": { "type": "string" }
       },

@@ -180,7 +180,7 @@ export default function App() {
     }
   };
 
-  const handleDetection = (detection: any) => {
+  const handleDetection = (detection: any, imageUrl: string) => {
     if (!userLocation) return;
     
     // Auto-report to municipal silently
@@ -188,7 +188,8 @@ export default function App() {
       latitude: userLocation.lat,
       longitude: userLocation.lng,
       severity: detection.score > 0.8 ? 'high' : 'medium',
-      address: 'AI Detected - Road Focus Active'
+      address: 'AI Detected - Road Focus Active',
+      reportImageUrl: imageUrl
     }, true);
   };
 

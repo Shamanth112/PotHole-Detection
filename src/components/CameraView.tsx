@@ -2,11 +2,12 @@ import React, { useRef, useEffect, useState } from 'react';
 import { loadModel, detectPotholes, Detection } from '../services/detectionService';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../firebase';
-import { Camera, AlertTriangle, ShieldCheck, ArrowLeft } from 'lucide-react';
+import { Camera, AlertTriangle, ShieldCheck, ArrowLeft, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { uploadPotholeImageFromBlob } from '../services/storageService';
 
 interface CameraViewProps {
-  onDetection: (detection: Detection) => void;
+  onDetection: (detection: Detection, imageUrl: string) => void;
   onBack: () => void;
   gpsActive: boolean;
 }
@@ -17,6 +18,7 @@ export default function CameraView({ onDetection, onBack, gpsActive }: CameraVie
   const [isModelLoading, setIsModelLoading] = useState(true);
   const [detections, setDetections] = useState<Detection[]>([]);
   const [isDetecting, setIsDetecting] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const lastDetectionTime = useRef<number>(0);
 
   useEffect(() => {
@@ -97,8 +99,31 @@ export default function CameraView({ onDetection, onBack, gpsActive }: CameraVie
   };
 
   const handlePotholeDetected = async (detection: Detection) => {
-    if (!auth.currentUser) return;
-    onDetection(detection);
+    if (!auth.currentUser || !videoRef.current || !canvasRef.current || isUploading) return;
+    
+    setIsUploading(true);
+    try {
+      // Capture current frame
+      const canvas = document.createElement('canvas');
+      canvas.width = videoRef.current.videoWidth;
+      canvas.height = videoRef.current.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(videoRef.current, 0, 0);
+        
+        // Convert to blob
+        const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
+        if (blob) {
+          const reportId = `ai_report_${Date.now()}`;
+          const imageUrl = await uploadPotholeImageFromBlob(blob, `reports/${auth.currentUser.uid}/${reportId}.jpg`);
+          onDetection(detection, imageUrl);
+        }
+      }
+    } catch (error) {
+      console.error("Error capturing/uploading AI detection image:", error);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   return (
@@ -130,9 +155,9 @@ export default function CameraView({ onDetection, onBack, gpsActive }: CameraVie
       
       <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
         <div className="flex items-center gap-2 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20">
-          <div className={`w-2 h-2 rounded-full ${isModelLoading ? 'bg-yellow-500 animate-pulse' : 'bg-red-600 animate-pulse'}`} />
+          <div className={`w-2 h-2 rounded-full ${isModelLoading || isUploading ? 'bg-yellow-500 animate-pulse' : 'bg-red-600 animate-pulse'}`} />
           <span className="text-[10px] font-black uppercase tracking-widest text-white">
-            {isModelLoading ? 'AI Loading...' : 'AI ACTIVE'}
+            {isModelLoading ? 'AI Loading...' : isUploading ? 'UPLOADING...' : 'AI ACTIVE'}
           </span>
         </div>
         <div className="bg-black/40 backdrop-blur-md px-3 py-1 rounded-lg border border-white/10 flex items-center gap-2">
