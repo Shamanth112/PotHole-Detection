@@ -44,9 +44,11 @@ service cloud.firestore {
     }
     
     function isAdmin() {
-      return isAuthenticated() &&
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-          (request.auth.token.email == "shamanth.p2007@gmail.com" && request.auth.token.email_verified == true));
+      return isAuthenticated() && (
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+        (request.auth.token.email == "shamanth.p2007@gmail.com" && request.auth.token.email_verified == true)
+      );
     }
 
     function isMunicipal() {
@@ -92,8 +94,8 @@ service cloud.firestore {
         isOwner(userId) && (
           request.resource.data.role == resource.data.role ||
           (
-            exists(/databases/$(database)/documents/permitted_users/$(request.auth.token.email.toLower())) &&
-            request.resource.data.role == get(/databases/$(database)/documents/permitted_users/$(request.auth.token.email.toLower())).data.role
+            exists(/databases/$(database)/documents/permitted_users/$(request.auth.token.email.lower())) &&
+            request.resource.data.role == get(/databases/$(database)/documents/permitted_users/$(request.auth.token.email.lower())).data.role
           )
         )
       );
