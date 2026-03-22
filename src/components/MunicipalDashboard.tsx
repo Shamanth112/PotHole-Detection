@@ -91,6 +91,9 @@ export default function MunicipalDashboard({ potholes: propPotholes }: Municipal
 
       if (error) throw error;
 
+      // Optimistically update the UI so the animation and buttons respond instantly
+      setAllPotholes(prev => prev.map(p => p.id === id ? { ...p, ...updateData } : p));
+
       setResolvingId(null);
       clearSelection();
     } catch (error: any) {
