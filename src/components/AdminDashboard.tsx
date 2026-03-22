@@ -214,7 +214,7 @@ export default function AdminDashboard() {
           severity: newPothole.severity,
           address: newPothole.address || 'Manual Entry',
           status: 'reported',
-          timestamp: new Date().toISOString(),
+          created_at: new Date().toISOString(),
           user_id: firebaseUser?.uid || null,
           user_name: 'Admin Manual Entry'
         });
@@ -507,15 +507,15 @@ export default function AdminDashboard() {
                   <div className="flex items-start gap-4">
                     {/* Avatar */}
                     <img
-                      src={u.photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.display_name || u.email || 'U')}&background=1a365d&color=fff`}
-                      alt={u.display_name || u.email}
+                      src={u.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.full_name || u.email || 'U')}&background=1a365d&color=fff`}
+                      alt={u.full_name || u.email}
                       className="w-12 h-12 rounded-2xl border border-zinc-700 object-cover shrink-0"
                     />
 
                     {/* Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-bold text-white truncate">{u.display_name || 'No Name'}</p>
+                        <p className="text-sm font-bold text-white truncate">{u.full_name || 'No Name'}</p>
                         <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded ${
                           u.role === 'admin' ? 'bg-purple-500/20 text-purple-500 border border-purple-500/30' : 
                           u.role === 'municipal' ? 'bg-emerald-500/20 text-emerald-500 border border-emerald-500/30' : 
@@ -623,6 +623,8 @@ export default function AdminDashboard() {
                               className="w-full bg-black border border-zinc-700 rounded-xl py-2 px-3 text-sm text-white outline-none focus:ring-2 focus:ring-blue-500"
                             >
                               <option value="reported">Reported</option>
+                              <option value="verified">Verified</option>
+                              <option value="fixing">Fixing</option>
                               <option value="in-progress">In Progress</option>
                               <option value="resolved">Resolved</option>
                               <option value="dismissed">Dismissed</option>

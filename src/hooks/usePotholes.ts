@@ -8,9 +8,9 @@ export interface Pothole {
   latitude: number;
   longitude: number;
   created_at: string;
-  timestamp?: string; // keep for backwards compat
+  timestamp?: string; // legacy support
   severity: 'low' | 'medium' | 'high';
-  status: 'reported' | 'verified' | 'fixing' | 'resolved';
+  status: 'reported' | 'verified' | 'fixing' | 'in-progress' | 'resolved' | 'dismissed';
   report_image_url?: string;
   resolved_image_url?: string;
   user_id: string;

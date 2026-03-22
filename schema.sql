@@ -46,10 +46,10 @@ CREATE TABLE IF NOT EXISTS public.potholes (
   longitude DOUBLE PRECISION NOT NULL,
   address TEXT,
   severity TEXT NOT NULL CHECK (severity IN ('low', 'medium', 'high')),
-  status TEXT DEFAULT 'reported' CHECK (status IN ('reported', 'in-progress', 'resolved', 'dismissed')),
+  status TEXT DEFAULT 'reported' CHECK (status IN ('reported', 'verified', 'fixing', 'in-progress', 'resolved', 'dismissed')),
   report_image_url TEXT,
   resolved_image_url TEXT,
-  timestamp TIMESTAMPTZ DEFAULT NOW(),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -59,11 +59,35 @@ ALTER TABLE public.permitted_users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.potholes ENABLE ROW LEVEL SECURITY;
 
 -- Policies for 'users' table
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.users 
+    WHERE id = auth.uid()::text 
+    AND role = 'admin'
+  );
+$$ LANGUAGE sql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION public.is_municipal_or_admin()
+RETURNS BOOLEAN AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.users 
+    WHERE id = auth.uid()::text 
+    AND role IN ('municipal', 'admin')
+  );
+$$ LANGUAGE sql SECURITY DEFINER;
+
 CREATE POLICY "Users can view their own profile" ON public.users
-  FOR SELECT USING (auth.uid() = id);
+  FOR SELECT USING (auth.uid()::text = id);
 
 CREATE POLICY "Users can update their own profile" ON public.users
-  FOR UPDATE USING (auth.uid() = id);
+  FOR UPDATE USING (auth.uid()::text = id);
+
+CREATE POLICY "Admins can view all profiles" ON public.users
+  FOR SELECT USING (public.is_admin());
+
+CREATE POLICY "Admins can update all profiles" ON public.users
+  FOR UPDATE USING (public.is_admin());
 
 -- Policies for 'potholes' table
 CREATE POLICY "Anyone can view potholes" ON public.potholes
@@ -73,18 +97,8 @@ CREATE POLICY "Authenticated users can report potholes" ON public.potholes
   FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
 
 CREATE POLICY "Municipal and Admin users can update potholes" ON public.potholes
-  FOR UPDATE USING (
-    EXISTS (
-      SELECT 1 FROM public.users
-      WHERE id = auth.uid() AND role IN ('municipal', 'admin')
-    )
-  );
+  FOR UPDATE USING (public.is_municipal_or_admin());
 
 -- Policies for 'permitted_users' table
 CREATE POLICY "Admin users can manage permitted users" ON public.permitted_users
-  FOR ALL USING (
-    EXISTS (
-      SELECT 1 FROM public.users
-      WHERE id = auth.uid() AND role = 'admin'
-    )
-  );
+  FOR ALL USING (public.is_admin());
