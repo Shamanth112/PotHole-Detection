@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { loadModel, detectPotholes, Detection } from '../services/detectionService';
+import { loadModel, detectPotholes, isModelLoaded, getModelError, Detection } from '../services/detectionService';
 import { auth } from '../firebase';
-import { Camera, AlertTriangle, ShieldCheck, ArrowLeft, Zap, Activity } from 'lucide-react';
+import { Camera, AlertTriangle, ShieldCheck, ArrowLeft, Zap, Activity, PackageOpen } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { uploadPotholeImageFromBlob } from '../services/storageService';
 
@@ -11,16 +11,16 @@ interface CameraViewProps {
   gpsActive: boolean;
 }
 
-// Corner bracket for bounding box decoration
-function drawCornerBracket(
+/** Draw corner-bracket bounding box */
+function drawBracketBox(
   ctx: CanvasRenderingContext2D,
   x: number, y: number, w: number, h: number,
-  size: number, color: string, lineWidth: number
+  color: string, lineWidth: number
 ) {
+  const s = Math.min(22, w * 0.28, h * 0.28);
   ctx.strokeStyle = color;
   ctx.lineWidth = lineWidth;
   ctx.lineCap = 'round';
-  const s = Math.min(size, w * 0.3, h * 0.3);
   // TL
   ctx.beginPath(); ctx.moveTo(x, y + s); ctx.lineTo(x, y); ctx.lineTo(x + s, y); ctx.stroke();
   // TR
@@ -35,49 +35,45 @@ export default function CameraView({ onDetection, onBack, gpsActive }: CameraVie
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animFrameRef = useRef<number>(0);
-  const isProcessingRef = useRef(false);  // Prevents detection queue buildup
+  const isProcessingRef = useRef(false);
   const lastDetectionTime = useRef<number>(0);
-  const fpsRef = useRef<{ frames: number; last: number; value: number }>({ frames: 0, last: Date.now(), value: 0 });
-  const lastDetectionsRef = useRef<Detection[]>([]); // Keep last frame's detections for drawing during processing
+  const lastDetectionsRef = useRef<Detection[]>([]);
+  const fpsRef = useRef<{ frames: number; last: number }>({ frames: 0, last: Date.now() });
 
-  const [isModelLoading, setIsModelLoading] = useState(true);
+  const [modelStatus, setModelStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [modelErrorMsg, setModelErrorMsg] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [showShutter, setShowShutter] = useState(false);
   const [showReportedToast, setShowReportedToast] = useState(false);
   const [fps, setFps] = useState(0);
-  const [currentDetections, setCurrentDetections] = useState<Detection[]>([]);
+  const [liveDetections, setLiveDetections] = useState<Detection[]>([]);
   const [cameraReady, setCameraReady] = useState(false);
 
-  // ──────────────────────────────────────────────
-  // Camera setup
-  // ──────────────────────────────────────────────
+  // ── Camera startup ──────────────────────────────────────────────────────
   const startCamera = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: 'environment' },
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: false,
       });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
+      if (videoRef.current) videoRef.current.srcObject = stream;
     } catch {
-      // Fallback: any camera
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
       if (videoRef.current) videoRef.current.srcObject = stream;
     }
   }, []);
 
   useEffect(() => {
-    async function setup() {
-      await loadModel();
-      setIsModelLoading(false);
-      await startCamera();
-    }
-    setup();
+    (async () => {
+      try {
+        await loadModel();
+        setModelStatus('ready');
+        await startCamera();
+      } catch (err: any) {
+        setModelStatus('error');
+        setModelErrorMsg(err?.message || String(err));
+      }
+    })();
     return () => {
       cancelAnimationFrame(animFrameRef.current);
       if (videoRef.current?.srcObject) {
@@ -86,176 +82,143 @@ export default function CameraView({ onDetection, onBack, gpsActive }: CameraVie
     };
   }, []);
 
-  // ──────────────────────────────────────────────
-  // Canvas sizing — match the video's DISPLAYED size
-  // ──────────────────────────────────────────────
-  const syncCanvasSize = useCallback(() => {
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas) return;
-    // Use the element's rendered pixel dimensions (not stream resolution)
-    const rect = video.getBoundingClientRect();
-    if (canvas.width !== rect.width || canvas.height !== rect.height) {
-      canvas.width = rect.width;
-      canvas.height = rect.height;
+  // ── Canvas sizing: always match the element's rendered pixel size ────────
+  const syncCanvas = useCallback(() => {
+    const v = videoRef.current, c = canvasRef.current;
+    if (!v || !c) return;
+    const r = v.getBoundingClientRect();
+    if (c.width !== r.width || c.height !== r.height) {
+      c.width = r.width;
+      c.height = r.height;
     }
   }, []);
 
-  // ──────────────────────────────────────────────
-  // Drawing: bounding boxes + grid overlay
-  // ──────────────────────────────────────────────
-  const drawFrame = useCallback((detections: Detection[]) => {
+  // ── Drawing ──────────────────────────────────────────────────────────────
+  const drawOverlay = useCallback((detections: Detection[]) => {
     const canvas = canvasRef.current;
     const video = videoRef.current;
     if (!canvas || !video) return;
-    syncCanvasSize();
+    syncCanvas();
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
     const W = canvas.width;
     const H = canvas.height;
-    const scaleX = W / (video.videoWidth || W);
-    const scaleY = H / (video.videoHeight || H);
-    const ROI_Y = H * 0.42; // Top of road detection zone
+    const scaleX = W / (video.videoWidth || 1);
+    const scaleY = H / (video.videoHeight || 1);
+    const ROI_Y = H * 0.42;
 
     ctx.clearRect(0, 0, W, H);
 
-    // ── Subtle scan grid (bottom 58% only) ──
+    // Grid overlay in road zone
     ctx.save();
     ctx.strokeStyle = 'rgba(59,130,246,0.06)';
     ctx.lineWidth = 0.5;
-    const gridSize = 36;
-    for (let x = 0; x < W; x += gridSize) {
-      ctx.beginPath(); ctx.moveTo(x, ROI_Y); ctx.lineTo(x, H); ctx.stroke();
-    }
-    for (let y = ROI_Y; y < H; y += gridSize) {
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
-    }
+    const g = 36;
+    for (let x = 0; x < W; x += g) { ctx.beginPath(); ctx.moveTo(x, ROI_Y); ctx.lineTo(x, H); ctx.stroke(); }
+    for (let y = ROI_Y; y < H; y += g) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
     ctx.restore();
 
-    // ── ROI divider line ──
+    // ROI divider
     ctx.save();
     ctx.setLineDash([6, 6]);
-    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
     ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(0, ROI_Y); ctx.lineTo(W, ROI_Y); ctx.stroke();
     ctx.restore();
 
-    // ── Bounding boxes ──
-    const potholes = detections.filter(d => d.class === 'pothole' && d.score > 0.45);
-    const others = detections.filter(d => d.class !== 'pothole');
-
-    // Draw non-pothole detections faintly
-    ctx.save();
-    others.forEach(d => {
-      const [bx, by, bw, bh] = d.bbox;
-      const x = bx * scaleX, y = by * scaleY, w = bw * scaleX, h = bh * scaleY;
-      ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(x, y, w, h);
-    });
-    ctx.restore();
-
-    // Draw potholes with corner brackets + glow
-    potholes.forEach(d => {
+    // Pothole bounding boxes
+    detections.forEach(d => {
+      if (d.class !== 'pothole') return;
       const [bx, by, bw, bh] = d.bbox;
       const x = bx * scaleX, y = by * scaleY, w = bw * scaleX, h = bh * scaleY;
       const pct = Math.round(d.score * 100);
-      const isOnRoad = (by + bh / 2) * scaleY > ROI_Y;
+      const onRoad = (by + bh / 2) * scaleY > ROI_Y;
 
-      // Glow shadow
+      const color = onRoad
+        ? (pct >= 80 ? '#ef4444' : pct >= 60 ? '#f97316' : '#eab308')
+        : 'rgba(239,68,68,0.3)';
+
+      // Glow fill
       ctx.save();
-      ctx.shadowColor = isOnRoad ? '#ef4444' : 'rgba(239,68,68,0.3)';
-      ctx.shadowBlur = isOnRoad ? 20 : 6;
-
-      // Semi-transparent fill
-      ctx.fillStyle = isOnRoad ? 'rgba(239,68,68,0.08)' : 'rgba(239,68,68,0.03)';
+      ctx.shadowColor = color;
+      ctx.shadowBlur = onRoad ? 18 : 4;
+      ctx.fillStyle = onRoad ? `${color}12` : `${color}06`;
       ctx.fillRect(x, y, w, h);
 
       // Corner brackets
-      const bracketColor = isOnRoad ? '#ef4444' : 'rgba(239,68,68,0.35)';
-      drawCornerBracket(ctx, x, y, w, h, 20, bracketColor, isOnRoad ? 3 : 1.5);
+      drawBracketBox(ctx, x, y, w, h, color, onRoad ? 2.5 : 1.2);
       ctx.restore();
 
-      if (isOnRoad) {
-        // Confidence pill label
+      if (onRoad) {
+        // Label pill
         const label = `POTHOLE  ${pct}%`;
         ctx.save();
         ctx.font = 'bold 11px monospace';
-        const tw = ctx.measureText(label).width;
-        const lx = x;
+        const tw = ctx.measureText(label).width + 16;
         const ly = y > 28 ? y - 10 : y + h + 10;
-        ctx.fillStyle = 'rgba(239,68,68,0.9)';
+        ctx.fillStyle = color;
         ctx.beginPath();
-        ctx.roundRect(lx, ly - 14, tw + 16, 18, 4);
+        (ctx as any).roundRect(x, ly - 14, tw, 18, 4);
         ctx.fill();
         ctx.fillStyle = '#fff';
-        ctx.fillText(label, lx + 8, ly);
+        ctx.fillText(label, x + 8, ly);
         ctx.restore();
 
-        // Animated cross-hair center
-        const cx = x + w / 2, cy = y + h / 2;
-        const cht = 8;
+        // Crosshair
+        const cx = x + w / 2, cy = y + h / 2, cs = 9;
         ctx.save();
-        ctx.strokeStyle = 'rgba(239,68,68,0.7)';
+        ctx.strokeStyle = `${color}aa`;
         ctx.lineWidth = 1.5;
-        ctx.beginPath(); ctx.moveTo(cx - cht, cy); ctx.lineTo(cx + cht, cy); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(cx, cy - cht); ctx.lineTo(cx, cy + cht); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(cx - cs, cy); ctx.lineTo(cx + cs, cy); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(cx, cy - cs); ctx.lineTo(cx, cy + cs); ctx.stroke();
         ctx.restore();
       }
     });
-  }, [syncCanvasSize]);
+  }, [syncCanvas]);
 
-  // ──────────────────────────────────────────────
-  // Main render loop: draws every frame, detects every ~150ms if not busy
-  // ──────────────────────────────────────────────
+  // ── Main render loop ─────────────────────────────────────────────────────
   useEffect(() => {
-    if (isModelLoading) return;
+    if (modelStatus !== 'ready') return;
 
     let frameCount = 0;
-    const DETECT_EVERY_N_FRAMES = 5; // ~150ms at 30fps
+    const DETECT_EVERY = 5; // every 5 frames ≈ detect at ~6 Hz
 
     const loop = () => {
       animFrameRef.current = requestAnimationFrame(loop);
 
-      // FPS counter
+      // FPS
       fpsRef.current.frames++;
       const now = Date.now();
       if (now - fpsRef.current.last >= 1000) {
-        const newFps = fpsRef.current.frames;
-        fpsRef.current = { frames: 0, last: now, value: newFps };
-        setFps(newFps);
+        setFps(fpsRef.current.frames);
+        fpsRef.current = { frames: 0, last: now };
       }
 
-      // Always draw the last known detections (smooth visual)
-      drawFrame(lastDetectionsRef.current);
+      // Always draw at full frame rate using last result
+      drawOverlay(lastDetectionsRef.current);
 
-      // Run detection only every N frames and only if not already processing
       frameCount++;
-      if (frameCount % DETECT_EVERY_N_FRAMES === 0 && !isProcessingRef.current && videoRef.current?.readyState === 4) {
+      const video = videoRef.current;
+      if (frameCount % DETECT_EVERY === 0 && !isProcessingRef.current && video?.readyState === 4) {
         isProcessingRef.current = true;
-        detectPotholes(videoRef.current!).then(results => {
-          const ROI_TOP_PERCENT = 0.42;
-          const videoH = videoRef.current?.videoHeight || 1;
-          const potholes = results.filter(d => {
-            if (d.class !== 'pothole' || d.score < 0.45) return false;
-            const centerY = d.bbox[1] + d.bbox[3] / 2;
-            return (centerY / videoH) > ROI_TOP_PERCENT;
-          });
+        detectPotholes(video).then(results => {
+          const videoH = video.videoHeight || 1;
+          const ROI_TOP = 0.42;
+          const filtered = results.filter(d =>
+            d.class === 'pothole' && d.score >= 0.40 &&
+            (d.bbox[1] + d.bbox[3] / 2) / videoH > ROI_TOP
+          );
 
           lastDetectionsRef.current = results;
-          setCurrentDetections(potholes);
+          setLiveDetections(filtered);
 
-          // Auto-report throttle: at most once per 3 seconds
-          if (potholes.length > 0) {
-            const t = Date.now();
-            if (t - lastDetectionTime.current > 3000) {
-              lastDetectionTime.current = t;
-              captureAndReport(potholes[0]);
-            }
+          if (filtered.length > 0 && Date.now() - lastDetectionTime.current > 3000) {
+            lastDetectionTime.current = Date.now();
+            captureAndReport(filtered[0]);
           }
-        }).finally(() => {
+        }).catch(console.error).finally(() => {
           isProcessingRef.current = false;
         });
       }
@@ -263,78 +226,91 @@ export default function CameraView({ onDetection, onBack, gpsActive }: CameraVie
 
     animFrameRef.current = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(animFrameRef.current);
-  }, [isModelLoading, drawFrame]);
+  }, [modelStatus, drawOverlay]);
 
-  // ──────────────────────────────────────────────
-  // Capture frame and report (fixed: uses Firebase auth, not Supabase auth)
-  // ──────────────────────────────────────────────
+  // ── Capture + report ──────────────────────────────────────────────────────
   const captureAndReport = async (detection: Detection) => {
     const firebaseUser = auth.currentUser;
     if (!firebaseUser || !videoRef.current || isUploading) return;
 
     setIsUploading(true);
     setShowShutter(true);
-    setTimeout(() => setShowShutter(false), 120);
+    setTimeout(() => setShowShutter(false), 110);
 
     try {
       const cap = document.createElement('canvas');
       cap.width = videoRef.current.videoWidth;
       cap.height = videoRef.current.videoHeight;
-      const capCtx = cap.getContext('2d');
-      if (!capCtx) return;
-      capCtx.drawImage(videoRef.current, 0, 0);
-
-      const blob = await new Promise<Blob | null>(res => cap.toBlob(res, 'image/jpeg', 0.82));
+      cap.getContext('2d')!.drawImage(videoRef.current, 0, 0);
+      const blob = await new Promise<Blob | null>(r => cap.toBlob(r, 'image/jpeg', 0.85));
       if (!blob) return;
 
-      const reportId = `ai_${Date.now()}`;
-      const imageUrl = await uploadPotholeImageFromBlob(blob, `reports/${firebaseUser.uid}/${reportId}.jpg`);
-      onDetection(detection, imageUrl);
-
+      const url = await uploadPotholeImageFromBlob(
+        blob,
+        `reports/${firebaseUser.uid}/ai_${Date.now()}.jpg`
+      );
+      onDetection(detection, url);
       setShowReportedToast(true);
       setTimeout(() => setShowReportedToast(false), 2500);
-    } catch (err) {
-      console.error('Capture/upload error:', err);
+    } catch (e) {
+      console.error('Capture error:', e);
     } finally {
       setIsUploading(false);
     }
   };
 
-  const topPothole = currentDetections[0];
-  const confidence = topPothole ? Math.round(topPothole.score * 100) : 0;
-  const severityLabel = confidence >= 85 ? 'HIGH' : confidence >= 65 ? 'MEDIUM' : 'LOW';
-  const severityColor = confidence >= 85 ? '#ef4444' : confidence >= 65 ? '#f97316' : '#eab308';
+  const topHit = liveDetections[0];
+  const conf = topHit ? Math.round(topHit.score * 100) : 0;
+  const severity = conf >= 80 ? { label: 'HIGH', color: '#ef4444' }
+    : conf >= 60 ? { label: 'MEDIUM', color: '#f97316' }
+    : { label: 'LOW', color: '#eab308' };
+
+  // ── Model error screen ───────────────────────────────────────────────────
+  if (modelStatus === 'error') {
+    return (
+      <div className="relative w-full h-full bg-zinc-950 rounded-2xl border border-zinc-800 flex flex-col items-center justify-center p-8 gap-6">
+        <div className="w-16 h-16 bg-amber-500/10 rounded-2xl flex items-center justify-center border border-amber-500/20">
+          <PackageOpen className="w-8 h-8 text-amber-500" />
+        </div>
+        <div className="text-center max-w-sm">
+          <h3 className="text-white font-black text-lg uppercase tracking-tight mb-2">YOLO Model Not Found</h3>
+          <p className="text-zinc-400 text-xs leading-relaxed mb-4">
+            Place your exported <span className="text-white font-mono">best.onnx</span> file in the <span className="text-white font-mono">public/</span> folder and add <span className="text-white font-mono">VITE_MODEL_URL=/best.onnx</span> to your <span className="text-white font-mono">.env</span> file.
+          </p>
+          <div className="bg-black rounded-xl p-4 text-left border border-zinc-800 space-y-1">
+            <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2">Export Command</p>
+            <p className="text-emerald-400 font-mono text-xs">yolo export model=best.pt \</p>
+            <p className="text-emerald-400 font-mono text-xs pl-4">format=onnx imgsz=640</p>
+          </div>
+        </div>
+        <button
+          onClick={onBack}
+          className="flex items-center gap-2 px-6 py-3 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-sm font-bold transition-all"
+        >
+          <ArrowLeft className="w-4 h-4" /> Go Back
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="relative w-full h-full bg-black overflow-hidden rounded-2xl shadow-2xl border border-zinc-800">
-      {/* Live video */}
+      {/* Video */}
       <video
         ref={videoRef}
-        autoPlay
-        playsInline
-        muted
+        autoPlay playsInline muted
         className="absolute inset-0 w-full h-full object-cover"
-        onLoadedMetadata={() => {
-          syncCanvasSize();
-          setCameraReady(true);
-        }}
+        onLoadedMetadata={() => { syncCanvas(); setCameraReady(true); }}
       />
 
-      {/* Detection overlay canvas */}
-      <canvas
-        ref={canvasRef}
-        className="absolute inset-0 w-full h-full pointer-events-none"
-        style={{ mixBlendMode: 'normal' }}
-      />
+      {/* YOLO overlay canvas */}
+      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />
 
       {/* Shutter flash */}
       <AnimatePresence>
         {showShutter && (
           <motion.div
-            initial={{ opacity: 0.8 }}
-            animate={{ opacity: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.12 }}
+            initial={{ opacity: 0.7 }} animate={{ opacity: 0 }} transition={{ duration: 0.11 }}
             className="absolute inset-0 bg-white z-[60] pointer-events-none"
           />
         )}
@@ -360,10 +336,8 @@ export default function CameraView({ onDetection, onBack, gpsActive }: CameraVie
 
       {/* Model loading screen */}
       <AnimatePresence>
-        {isModelLoading && (
-          <motion.div
-            initial={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+        {modelStatus === 'loading' && (
+          <motion.div initial={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="absolute inset-0 z-50 bg-black flex flex-col items-center justify-center gap-6"
           >
             <div className="relative w-20 h-20">
@@ -372,30 +346,25 @@ export default function CameraView({ onDetection, onBack, gpsActive }: CameraVie
               <Zap className="absolute inset-0 m-auto w-8 h-8 text-red-500" />
             </div>
             <div className="text-center">
-              <p className="text-white font-black text-lg uppercase tracking-widest">Loading AI Model</p>
-              <p className="text-zinc-500 text-xs mt-1">Initializing TensorFlow lite engine...</p>
+              <p className="text-white font-black text-lg uppercase tracking-widest">Loading YOLO Model</p>
+              <p className="text-zinc-500 text-xs mt-1">Initializing ONNX Runtime WebAssembly…</p>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* ── Top-left HUD ── */}
-      <div className="absolute top-4 left-4 z-20 flex flex-col gap-2">
-        {/* AI status */}
+      <div className="absolute top-4 left-4 z-20 flex flex-col gap-1.5">
         <div className="flex items-center gap-2 bg-black/70 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
-          <div className={`w-2 h-2 rounded-full ${isModelLoading ? 'bg-yellow-500 animate-pulse' : isUploading ? 'bg-blue-400 animate-pulse' : 'bg-red-500 animate-pulse'}`} />
+          <div className={`w-2 h-2 rounded-full animate-pulse ${isUploading ? 'bg-blue-400' : modelStatus === 'ready' ? 'bg-red-500' : 'bg-yellow-500'}`} />
           <span className="text-[10px] font-black uppercase tracking-widest text-white">
-            {isModelLoading ? 'AI Init…' : isUploading ? 'Uploading' : 'AI Live'}
+            {isUploading ? 'Uploading' : modelStatus === 'ready' ? 'YOLO Active' : 'Loading…'}
           </span>
         </div>
-
-        {/* GPS */}
         <div className="flex items-center gap-2 bg-black/50 backdrop-blur-md px-3 py-1 rounded-lg border border-white/10">
           <div className={`w-1.5 h-1.5 rounded-full ${gpsActive ? 'bg-emerald-400' : 'bg-red-500 animate-pulse'}`} />
           <span className="text-[10px] font-mono text-zinc-300">GPS: {gpsActive ? 'LOCKED' : 'WAITING'}</span>
         </div>
-
-        {/* FPS Counter */}
         {cameraReady && (
           <div className="flex items-center gap-2 bg-black/50 backdrop-blur-md px-3 py-1 rounded-lg border border-white/10">
             <Activity className="w-3 h-3 text-blue-400" />
@@ -406,15 +375,14 @@ export default function CameraView({ onDetection, onBack, gpsActive }: CameraVie
 
       {/* ── Top-right controls ── */}
       <div className="absolute top-4 right-4 z-20 flex gap-2">
-        <button
-          onClick={onBack}
-          className="p-3 bg-black/50 hover:bg-black/70 backdrop-blur-md rounded-full transition-all border border-white/10 active:scale-90"
+        <button onClick={onBack}
+          className="p-3 bg-black/50 hover:bg-black/70 backdrop-blur-md rounded-full border border-white/10 transition-all active:scale-90"
         >
           <ArrowLeft className="w-5 h-5 text-white" />
         </button>
         <button
           onClick={() => captureAndReport({ bbox: [0, 0, 0, 0], class: 'pothole', score: 1 })}
-          className="p-3 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-full transition-all border border-white/10 active:scale-90"
+          className="p-3 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-full border border-white/10 transition-all active:scale-90"
           title="Manual Capture"
         >
           <Camera className="w-5 h-5 text-white" />
@@ -430,76 +398,53 @@ export default function CameraView({ onDetection, onBack, gpsActive }: CameraVie
         </div>
       </div>
 
-      {/* ── Scanning line animation ── */}
+      {/* ── Scanning line ── */}
       <motion.div
         animate={{ top: ['42%', '100%', '42%'] }}
-        transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
+        transition={{ duration: 3.2, repeat: Infinity, ease: 'linear' }}
         className="absolute left-0 right-0 h-px z-10 pointer-events-none"
-        style={{
-          background: 'linear-gradient(90deg, transparent, rgba(239,68,68,0.6), transparent)',
-          boxShadow: '0 0 12px 2px rgba(239,68,68,0.3)',
-        }}
+        style={{ background: 'linear-gradient(90deg,transparent,rgba(239,68,68,0.55),transparent)', boxShadow: '0 0 10px 2px rgba(239,68,68,0.25)' }}
       />
 
-      {/* ── Live pothole alert banner ── */}
+      {/* ── Live pothole alert ── */}
       <AnimatePresence>
-        {currentDetections.length > 0 && (
+        {liveDetections.length > 0 && (
           <motion.div
             key="alert"
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 30 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 28 }}
-            className="absolute bottom-20 left-4 right-4 z-20"
+            exit={{ opacity: 0, y: 20 }}
+            transition={{ type: 'spring', stiffness: 320, damping: 28 }}
+            className="absolute bottom-4 left-4 right-4 z-20"
           >
             <div
               className="rounded-2xl p-4 flex items-center justify-between shadow-2xl border"
-              style={{
-                background: `${severityColor}18`,
-                borderColor: `${severityColor}40`,
-              }}
+              style={{ background: `${severity.color}14`, borderColor: `${severity.color}38` }}
             >
               <div className="flex items-center gap-4">
-                <div
-                  className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
-                  style={{ background: `${severityColor}25` }}
-                >
-                  <AlertTriangle className="w-6 h-6 animate-pulse" style={{ color: severityColor }} />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
+                  style={{ background: `${severity.color}22` }}>
+                  <AlertTriangle className="w-6 h-6 animate-pulse" style={{ color: severity.color }} />
                 </div>
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Road Hazard Detected</p>
-                  <p className="font-black text-lg italic uppercase tracking-tighter text-white">Pothole Identified</p>
-                  <p className="text-[10px] font-bold text-zinc-400 mt-0.5">{currentDetections.length} pothole{currentDetections.length > 1 ? 's' : ''} in frame</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Road Hazard · YOLO v8</p>
+                  <p className="font-black text-lg italic uppercase tracking-tighter text-white">Pothole Detected</p>
+                  <p className="text-[10px] font-bold text-zinc-500 mt-0.5">
+                    {liveDetections.length} instance{liveDetections.length > 1 ? 's' : ''} in frame
+                  </p>
                 </div>
               </div>
-              <div className="flex flex-col items-end gap-1">
-                <div
-                  className="px-3 py-1 rounded-lg font-black text-sm text-white"
-                  style={{ background: severityColor }}
-                >
-                  {confidence}%
-                </div>
-                <span
-                  className="text-[9px] font-black uppercase tracking-widest"
-                  style={{ color: severityColor }}
-                >
-                  {severityLabel}
+              <div className="flex flex-col items-end gap-1 shrink-0">
+                <div className="px-3 py-1 rounded-lg font-black text-sm text-white"
+                  style={{ background: severity.color }}>{conf}%</div>
+                <span className="text-[9px] font-black uppercase tracking-widest" style={{ color: severity.color }}>
+                  {severity.label}
                 </span>
               </div>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* ── Bottom info bar ── */}
-      <div className="absolute bottom-4 left-4 right-4 z-10">
-        <div className="bg-black/60 backdrop-blur-xl p-3 rounded-2xl border border-white/10 text-center">
-          <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-0.5">Simulation Mode</p>
-          <p className="text-[9px] text-zinc-500">
-            Point at a <span className="text-white">bowl · cup · bottle · phone</span> to simulate pothole detection
-          </p>
-        </div>
-      </div>
     </div>
   );
 }
