@@ -191,7 +191,7 @@ export default function App() {
           user_id: user.uid,
           user_name: user.displayName || 'Road Guardian',
           status: 'reported',
-          timestamp: new Date().toISOString()
+          created_at: new Date().toISOString()
         });
 
       if (error) throw error;
