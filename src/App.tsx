@@ -205,8 +205,12 @@ export default function App() {
           colors: ['#ef4444', '#f97316', '#eab308']
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error reporting pothole:", error);
+      if (!isAuto) {
+        alert("Failed to submit report: " + (error?.message || JSON.stringify(error)));
+      }
+      throw error; // re-throw so ReportView can handle it
     }
   };
 
