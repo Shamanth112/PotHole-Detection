@@ -73,9 +73,14 @@ export default function AdminDashboard() {
     const { data, error } = await supabase
       .from('potholes')
       .select('*')
-      .order('timestamp', { ascending: false })
+      .order('created_at', { ascending: false })
       .limit(100);
-    if (!error && data) setPotholes(data);
+    if (error) {
+      console.error("Fetch potholes error:", error);
+      alert("Error fetching potholes: " + error.message);
+    } else if (data) {
+      setPotholes(data);
+    }
   };
 
   const fetchPermittedUsers = async () => {
@@ -94,8 +99,9 @@ export default function AdminDashboard() {
       
       if (error) throw error;
       setUsers(data || []);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error fetching users:", err);
+      alert("Error fetching users: " + err.message);
     }
   };
 
