@@ -4,7 +4,7 @@ import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 
 interface HomeViewProps {
-  userRole: 'user' | 'admin' | 'municipal' | null;
+  userRole: 'citizen' | 'admin' | 'municipal' | null;
   onStartDetection: () => void;
   onReportManually: () => void;
   stats: {

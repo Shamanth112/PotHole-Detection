@@ -406,6 +406,7 @@ export default function App() {
                     className="h-full"
                   >
                     <HomeView 
+                      userRole={userRole}
                       onStartDetection={() => setActiveTab('scan')}
                       onReportManually={() => setActiveTab('report')}
                       stats={{
