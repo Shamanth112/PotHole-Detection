@@ -20,6 +20,8 @@ export default function AdminDashboard() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [usersLoading, setUsersLoading] = useState(false);
 
   // Editing states
   const [editingPotholeId, setEditingPotholeId] = useState<string | null>(null);
@@ -91,17 +93,29 @@ export default function AdminDashboard() {
   };
 
   const fetchUsers = async () => {
+    setUsersLoading(true);
+    setFetchError(null);
     try {
       const { data, error } = await supabase
         .from('users')
         .select('*')
         .order('email', { ascending: true });
       
-      if (error) throw error;
-      setUsers(data || []);
+      if (error) {
+        console.error("Error fetching users:", error);
+        setFetchError(`RLS Error: ${error.message} (code: ${error.code}). Run the SQL fix in Supabase Dashboard.`);
+        setUsers([]);
+      } else {
+        setUsers(data || []);
+        if ((data || []).length === 0) {
+          setFetchError('No users returned. The Supabase admin RLS policy may not be applied yet. Please run the SQL fix in your Supabase Dashboard → SQL Editor.');
+        }
+      }
     } catch (err: any) {
       console.error("Error fetching users:", err);
-      alert("Error fetching users: " + err.message);
+      setFetchError(`Unexpected error: ${err.message}`);
+    } finally {
+      setUsersLoading(false);
     }
   };
 
@@ -493,13 +507,31 @@ export default function AdminDashboard() {
             exit={{ opacity: 0, y: -10 }}
             className="bg-zinc-900 p-6 rounded-3xl border border-zinc-800"
           >
-            <h3 className="text-lg font-bold mb-6 flex items-center gap-2 italic uppercase tracking-tighter">
+            <h3 className="text-lg font-bold mb-4 flex items-center gap-2 italic uppercase tracking-tighter">
               <Users className="w-5 h-5 text-emerald-500" />
               Registered User Directory
               <span className="ml-auto text-xs font-black text-zinc-600 normal-case tracking-normal not-italic">{users.length} users</span>
+              <button
+                onClick={fetchUsers}
+                disabled={usersLoading}
+                className="ml-2 flex items-center gap-1 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50"
+              >
+                {usersLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : '↻'} Refresh
+              </button>
             </h3>
+            {fetchError && (
+              <div className="mb-4 p-4 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-2xl text-xs font-bold">
+                <p className="font-black uppercase tracking-widest mb-1">⚠ Diagnostic Info</p>
+                <p>{fetchError}</p>
+              </div>
+            )}
             <div className="grid grid-cols-1 gap-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
-              {users.length === 0 && (
+              {usersLoading && (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-8 h-8 text-zinc-600 animate-spin" />
+                </div>
+              )}
+              {!usersLoading && users.length === 0 && !fetchError && (
                 <p className="text-center text-zinc-600 text-xs italic py-8">No registered users found.</p>
               )}
               {users.map((u, i) => (
