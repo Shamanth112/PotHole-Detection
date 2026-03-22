@@ -2,14 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Upload, MapPin, CheckCircle2, AlertTriangle, Info, ArrowLeft, Loader2, Camera, X } from 'lucide-react';
 import { motion } from 'motion/react';
 import { uploadPotholeImage } from '../services/storageService';
-import { supabase } from '../supabase';
 
 interface ReportViewProps {
   onBack: () => void;
   onSubmit: (data: any) => void;
+  userId: string;
 }
 
-export default function ReportView({ onBack, onSubmit }: ReportViewProps) {
+export default function ReportView({ onBack, onSubmit, userId }: ReportViewProps) {
   const [severity, setSeverity] = useState<'low' | 'medium' | 'high'>('medium');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -71,14 +71,11 @@ export default function ReportView({ onBack, onSubmit }: ReportViewProps) {
     setIsSubmitting(true);
     
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("User not authenticated");
-
       const reportId = `report_${Date.now()}`;
       let reportImageUrl = '';
       
       try {
-        reportImageUrl = await uploadPotholeImage(selectedFile, `reports/${user.id}/${reportId}.jpg`);
+        reportImageUrl = await uploadPotholeImage(selectedFile, `reports/${userId}/${reportId}.jpg`);
       } catch (uploadError: any) {
         console.error("Upload error:", uploadError);
         throw new Error(`Photo upload failed: ${uploadError.message || 'Check storage permissions'}`);

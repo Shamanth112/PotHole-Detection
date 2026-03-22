@@ -462,6 +462,7 @@ export default function App() {
                     <ReportView 
                       onBack={() => setActiveTab('home')} 
                       onSubmit={(data) => handleReportPothole(data)} 
+                      userId={user.uid}
                     />
                   </motion.div>
                 )}
