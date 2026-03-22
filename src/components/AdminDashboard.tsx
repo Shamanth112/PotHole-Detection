@@ -486,56 +486,83 @@ export default function AdminDashboard() {
             <h3 className="text-lg font-bold mb-6 flex items-center gap-2 italic uppercase tracking-tighter">
               <Users className="w-5 h-5 text-emerald-500" />
               Registered User Directory
+              <span className="ml-auto text-xs font-black text-zinc-600 normal-case tracking-normal not-italic">{users.length} users</span>
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+            <div className="grid grid-cols-1 gap-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+              {users.length === 0 && (
+                <p className="text-center text-zinc-600 text-xs italic py-8">No registered users found.</p>
+              )}
               {users.map((u, i) => (
-                <div key={i} className="flex items-center justify-between p-4 bg-black/40 rounded-2xl border border-zinc-800 group hover:border-zinc-700 transition-all">
-                  <div className="flex-1 min-w-0 mr-4">
-                    <p className="text-sm font-bold text-white truncate">{u.email}</p>
-                    {editingUserId === u.id ? (
-                      <div className="flex items-center gap-2 mt-2">
-                        <select
-                          value={editUserRole}
-                          onChange={(e) => setEditUserRole(e.target.value)}
-                          className="bg-zinc-900 border border-zinc-700 rounded-lg py-1 px-2 text-xs text-white outline-none"
-                        >
-                          <option value="citizen">Citizen</option>
-                          <option value="municipal">Municipal</option>
-                          <option value="admin">Admin</option>
-                        </select>
-                        <button onClick={() => handleEditUserRole(u.id)} className="p-1 text-emerald-500 hover:text-emerald-400">
-                          <Save className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => setEditingUserId(null)} className="p-1 text-zinc-500 hover:text-white">
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2 mt-1">
+                <div key={i} className="p-4 bg-black/40 rounded-2xl border border-zinc-800 group hover:border-zinc-700 transition-all">
+                  <div className="flex items-start gap-4">
+                    {/* Avatar */}
+                    <img
+                      src={u.photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.display_name || u.email || 'U')}&background=1a365d&color=fff`}
+                      alt={u.display_name || u.email}
+                      className="w-12 h-12 rounded-2xl border border-zinc-700 object-cover shrink-0"
+                    />
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-bold text-white truncate">{u.display_name || 'No Name'}</p>
                         <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded ${
                           u.role === 'admin' ? 'bg-purple-500/20 text-purple-500 border border-purple-500/30' : 
                           u.role === 'municipal' ? 'bg-emerald-500/20 text-emerald-500 border border-emerald-500/30' : 
                           'bg-zinc-800 text-zinc-500'
                         }`}>
-                          {u.role}
+                          {u.role || 'citizen'}
                         </span>
                       </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <button 
-                      onClick={() => { setEditingUserId(u.id); setEditUserRole(u.role); }}
-                      className="p-2 text-zinc-700 hover:text-blue-500 transition-colors"
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                    <button 
-                      onClick={() => handleDeleteUser(u)}
-                      disabled={deletingId === u.id || u.role === 'admin'}
-                      className="p-2 text-zinc-700 hover:text-red-500 transition-colors disabled:opacity-30"
-                    >
-                      {deletingId === u.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                    </button>
+                      <p className="text-xs text-zinc-400 mt-0.5 truncate">{u.email}</p>
+                      <p className="text-[10px] text-zinc-600 font-mono mt-1 truncate" title={u.id}>UID: {u.id}</p>
+                      {u.created_at && (
+                        <p className="text-[10px] text-zinc-600 mt-0.5">
+                          Joined: {new Date(u.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      {editingUserId === u.id ? (
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={editUserRole}
+                            onChange={(e) => setEditUserRole(e.target.value)}
+                            className="bg-zinc-900 border border-zinc-700 rounded-lg py-1 px-2 text-xs text-white outline-none"
+                          >
+                            <option value="citizen">Citizen</option>
+                            <option value="municipal">Municipal</option>
+                            <option value="admin">Admin</option>
+                          </select>
+                          <button onClick={() => handleEditUserRole(u.id)} className="p-1 text-emerald-500 hover:text-emerald-400">
+                            <Save className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => setEditingUserId(null)} className="p-1 text-zinc-500 hover:text-white">
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <button 
+                            onClick={() => { setEditingUserId(u.id); setEditUserRole(u.role || 'citizen'); }}
+                            className="p-2 text-zinc-700 hover:text-blue-500 transition-colors"
+                            title="Edit role"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteUser(u)}
+                            disabled={deletingId === u.id || u.role === 'admin'}
+                            className="p-2 text-zinc-700 hover:text-red-500 transition-colors disabled:opacity-30"
+                            title="Delete user"
+                          >
+                            {deletingId === u.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
