@@ -118,9 +118,9 @@ export default function App() {
         .from('users')
         .upsert({
           id: authUser.uid,
-          display_name: authUser.displayName || authUser.email?.split('@')[0],
+          full_name: authUser.displayName || authUser.email?.split('@')[0],
           email: authUser.email,
-          photo_url: authUser.photoURL,
+          avatar_url: authUser.photoURL,
           role: role
         });
 
@@ -164,7 +164,7 @@ export default function App() {
       // Update Supabase users table
       const { error } = await supabase
         .from('users')
-        .update({ photo_url: photoURL })
+        .update({ avatar_url: photoURL })
         .eq('id', user.uid);
       
       if (error) throw error;
