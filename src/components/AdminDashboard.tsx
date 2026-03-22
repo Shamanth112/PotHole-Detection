@@ -669,7 +669,7 @@ export default function AdminDashboard() {
                             <h4 className="text-sm font-bold text-white truncate">{p.address || 'Unknown Location'}</h4>
                             <div className="flex items-center gap-3 mt-1 text-[10px] font-bold text-zinc-500 flex-wrap">
                               <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {p.latitude?.toFixed(4)}, {p.longitude?.toFixed(4)}</span>
-                              <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {new Date(p.timestamp).toLocaleString()}</span>
+                              <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {new Date(p.created_at).toLocaleString()}</span>
                               <span className={`px-2 py-0.5 rounded uppercase ${
                                 p.status === 'resolved' ? 'bg-emerald-500/20 text-emerald-500' : 
                                 p.status === 'in-progress' ? 'bg-blue-500/20 text-blue-500' : 
