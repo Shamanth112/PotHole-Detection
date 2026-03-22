@@ -103,7 +103,7 @@ export default function AdminDashboard() {
         .upsert({
           email: emailKey,
           role: newRole,
-          added_at: new Date().toISOString()
+          created_at: new Date().toISOString()
         });
 
       if (error) throw error;
