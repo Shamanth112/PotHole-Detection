@@ -406,7 +406,7 @@ export default function App() {
                       stats={{
                         detectedToday: potholes.filter(p => {
                           const today = new Date();
-                          const pDate = new Date(p.timestamp);
+                          const pDate = new Date(p.created_at);
                           return pDate.toDateString() === today.toDateString();
                         }).length,
                         fixedThisWeek: potholes.filter(p => p.status === 'resolved').length

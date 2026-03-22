@@ -48,7 +48,7 @@ export default function PotholeList({ potholes }: PotholeListProps) {
                     </span>
                     <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#a0aec0] uppercase tracking-widest">
                       <Clock className="w-3 h-3" />
-                      <span>{new Date(p.timestamp).toLocaleDateString()}</span>
+                      <span>{new Date(p.created_at).toLocaleDateString()}</span>
                     </div>
                   </div>
                 </div>
