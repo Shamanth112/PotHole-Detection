@@ -1,15 +1,43 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Pothole } from '../hooks/usePotholes';
-import { MapPin, User, Navigation, Clock, ShieldAlert, CheckCircle2, Loader2, AlertCircle, Camera, Image as ImageIcon, X } from 'lucide-react';
+import { MapPin, User, Navigation, Clock, ShieldAlert, CheckCircle2, Loader2, AlertCircle, Camera, Image as ImageIcon, X, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '../supabase';
 import { uploadPotholeImage } from '../services/storageService';
 
 interface MunicipalDashboardProps {
-  potholes: Pothole[];
+  potholes?: Pothole[]; // now optional, kept for backward compat
 }
 
-export default function MunicipalDashboard({ potholes }: MunicipalDashboardProps) {
+export default function MunicipalDashboard({ potholes: propPotholes }: MunicipalDashboardProps) {
+  const [allPotholes, setAllPotholes] = useState<Pothole[]>([]);
+  const [fetchLoading, setFetchLoading] = useState(true);
+
+  // Fetch ALL potholes directly — never filter by user
+  const fetchAll = async () => {
+    const { data, error } = await supabase
+      .from('potholes')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (!error && data) setAllPotholes(data);
+    setFetchLoading(false);
+  };
+
+  useEffect(() => {
+    fetchAll();
+    const channel = supabase
+      .channel('municipal-potholes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'potholes' }, () => {
+        fetchAll();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
+  // Use directly-fetched data; fall back to prop only if still loading
+  const potholes = fetchLoading ? (propPotholes || []) : allPotholes;
+
+
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
