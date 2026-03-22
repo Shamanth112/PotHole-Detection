@@ -48,12 +48,10 @@ export async function loadModel(): Promise<void> {
   if (session || modelLoadFailed) return;
 
   try {
-    // Serve WASM from the local public/ folder (copied at build time)
-    // This avoids CDN version mismatches and works offline / on Vercel
+    // Serve WASM + worker from public/ (ort-wasm-simd-threaded.wasm + .mjs committed to repo)
+    // v1.24.3 only ships threaded variants — numThreads=1 uses 1 thread without SharedArrayBuffer
     ort.env.wasm.wasmPaths = '/';
-    // SharedArrayBuffer (needed for multi-thread) requires COOP/COEP headers.
-    // Vercel doesn't set those by default, so force single-thread to be safe.
-    ort.env.wasm.numThreads = 1;
+    (ort.env.wasm as any).numThreads = 1;
 
     console.log(`[YOLO] Loading model from: ${MODEL_URL}`);
     session = await ort.InferenceSession.create(MODEL_URL, {
