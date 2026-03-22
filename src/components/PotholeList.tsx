@@ -3,6 +3,7 @@ import { Pothole } from '../hooks/usePotholes';
 import { MapPin, Clock, ChevronRight, AlertTriangle, Info, Trash2, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '../supabase';
+import ImageViewer from './ImageViewer';
 
 interface PotholeListProps {
   potholes: Pothole[];
@@ -11,6 +12,7 @@ interface PotholeListProps {
 export default function PotholeList({ potholes }: PotholeListProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [localPotholes, setLocalPotholes] = useState<Pothole[] | null>(null);
+  const [viewingImage, setViewingImage] = useState<{url: string, title: string} | null>(null);
 
   const displayPotholes = localPotholes ?? potholes;
 
@@ -92,13 +94,13 @@ export default function PotholeList({ potholes }: PotholeListProps) {
                     
                     <div className="flex gap-2 mt-2 overflow-x-auto pb-2">
                       {p.report_image_url && (
-                        <div className="shrink-0">
+                        <div className="shrink-0 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setViewingImage({url: p.report_image_url!, title: 'Report Photo'})}>
                           <p className="text-[8px] font-black text-[#a0aec0] uppercase tracking-widest mb-1">Report</p>
                           <img src={p.report_image_url} className="w-20 h-20 object-cover rounded-xl border border-[#e2e8f0]" alt="Report" referrerPolicy="no-referrer" />
                         </div>
                       )}
                       {p.resolved_image_url && (
-                        <div className="shrink-0">
+                        <div className="shrink-0 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setViewingImage({url: p.resolved_image_url!, title: 'Resolved Photo'})}>
                           <p className="text-[8px] font-black text-emerald-500 uppercase tracking-widest mb-1">Resolved</p>
                           <img src={p.resolved_image_url} className="w-20 h-20 object-cover rounded-xl border border-emerald-500/30" alt="Resolved" referrerPolicy="no-referrer" />
                         </div>
@@ -169,6 +171,12 @@ export default function PotholeList({ potholes }: PotholeListProps) {
           </div>
         )}
       </div>
+
+      <ImageViewer 
+        url={viewingImage?.url || null} 
+        title={viewingImage?.title} 
+        onClose={() => setViewingImage(null)} 
+      />
     </div>
   );
 }

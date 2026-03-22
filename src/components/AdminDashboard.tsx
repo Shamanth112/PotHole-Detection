@@ -7,6 +7,7 @@ import {
   TrendingUp, BarChart3, Shield, Pencil, Save, X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import ImageViewer from './ImageViewer';
 
 type AdminTab = 'stats' | 'users' | 'potholes' | 'permitted';
 
@@ -23,6 +24,8 @@ export default function AdminDashboard() {
   // Editing states
   const [editingPotholeId, setEditingPotholeId] = useState<string | null>(null);
   const [editPotholeData, setEditPotholeData] = useState<any>({});
+  const [viewingImage, setViewingImage] = useState<{url: string, title: string} | null>(null);
+
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editUserRole, setEditUserRole] = useState<string>('');
   const [editingPermittedEmail, setEditingPermittedEmail] = useState<string | null>(null);
@@ -232,6 +235,7 @@ export default function AdminDashboard() {
       
       if (error) throw error;
       setSuccess('Pothole report removed.');
+      fetchPotholes();
     } catch (err: any) {
       setError(err.message);
     }
@@ -667,6 +671,20 @@ export default function AdminDashboard() {
                           </div>
                           <div className="min-w-0">
                             <h4 className="text-sm font-bold text-white truncate">{p.address || 'Unknown Location'}</h4>
+                            
+                            <div className="flex gap-2 mt-2 mb-2 overflow-x-auto pb-1">
+                              {p.report_image_url && (
+                                <div className="shrink-0 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setViewingImage({url: p.report_image_url, title: 'Report Photo'})}>
+                                  <img src={p.report_image_url} className="w-16 h-16 object-cover rounded-xl border border-zinc-700" alt="Report" referrerPolicy="no-referrer" />
+                                </div>
+                              )}
+                              {p.resolved_image_url && (
+                                <div className="shrink-0 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setViewingImage({url: p.resolved_image_url, title: 'Resolved Photo'})}>
+                                  <img src={p.resolved_image_url} className="w-16 h-16 object-cover rounded-xl border border-emerald-500/30" alt="Resolved" referrerPolicy="no-referrer" />
+                                </div>
+                              )}
+                            </div>
+
                             <div className="flex items-center gap-3 mt-1 text-[10px] font-bold text-zinc-500 flex-wrap">
                               <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {p.latitude?.toFixed(4)}, {p.longitude?.toFixed(4)}</span>
                               <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {new Date(p.created_at).toLocaleString()}</span>

@@ -4,6 +4,7 @@ import { MapPin, User, Navigation, Clock, ShieldAlert, CheckCircle2, Loader2, Al
 import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '../supabase';
 import { uploadPotholeImage } from '../services/storageService';
+import ImageViewer from './ImageViewer';
 
 interface MunicipalDashboardProps {
   potholes?: Pothole[]; // now optional, kept for backward compat
@@ -12,6 +13,7 @@ interface MunicipalDashboardProps {
 export default function MunicipalDashboard({ potholes: propPotholes }: MunicipalDashboardProps) {
   const [allPotholes, setAllPotholes] = useState<Pothole[]>([]);
   const [fetchLoading, setFetchLoading] = useState(true);
+  const [viewingImage, setViewingImage] = useState<{url: string, title: string} | null>(null);
 
   // Fetch ALL potholes directly — never filter by user
   const fetchAll = async () => {
@@ -149,7 +151,7 @@ export default function MunicipalDashboard({ potholes: propPotholes }: Municipal
                           {p.address || `Pothole at ${p.latitude.toFixed(6)}, ${p.longitude.toFixed(6)}`}
                         </h3>
                         {p.report_image_url && (
-                          <div className="mt-2 mb-3">
+                          <div className="mt-2 mb-3 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setViewingImage({url: p.report_image_url!, title: 'Report Photo'})}>
                             <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1">Report Photo</p>
                             <img 
                               src={p.report_image_url} 
@@ -160,7 +162,7 @@ export default function MunicipalDashboard({ potholes: propPotholes }: Municipal
                           </div>
                         )}
                         {p.resolved_image_url && (
-                          <div className="mt-2 mb-3">
+                          <div className="mt-2 mb-3 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setViewingImage({url: p.resolved_image_url!, title: 'Resolution Photo'})}>
                             <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest mb-1">Resolution Photo</p>
                             <img 
                               src={p.resolved_image_url} 
@@ -299,6 +301,12 @@ export default function MunicipalDashboard({ potholes: propPotholes }: Municipal
           )}
         </div>
       </div>
+
+      <ImageViewer 
+        url={viewingImage?.url || null} 
+        title={viewingImage?.title} 
+        onClose={() => setViewingImage(null)} 
+      />
     </div>
   );
 }
