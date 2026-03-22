@@ -451,6 +451,7 @@ export default function App() {
                       onDetection={handleDetection} 
                       onBack={() => setActiveTab('home')} 
                       gpsActive={!!userLocation}
+                      userLocation={userLocation}
                     />
                   </motion.div>
                 )}
