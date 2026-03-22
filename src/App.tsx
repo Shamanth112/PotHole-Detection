@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from './supabase';
+import { supabase, setSupabaseToken } from './supabase';
+import { auth } from './firebase';
+import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import HomeView from './components/HomeView';
 import ReportView from './components/ReportView';
@@ -69,35 +71,27 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const initAuth = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
-          await syncUserProfile(session.user);
-        } else {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          const token = await firebaseUser.getIdToken();
+          setSupabaseToken(token);
+          await syncUserProfile(firebaseUser);
+        } catch (error) {
+          console.error("Auth init error:", error);
+          setSupabaseToken(null);
           setUser(null);
           setUserRole(null);
         }
-      } catch (error) {
-        console.error("Auth init error:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    initAuth();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        await syncUserProfile(session.user);
       } else {
+        setSupabaseToken(null);
         setUser(null);
         setUserRole(null);
       }
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => unsubscribe();
   }, []);
 
   const syncUserProfile = async (authUser: any) => {
@@ -123,20 +117,20 @@ export default function App() {
       const { error: upsertError } = await supabase
         .from('users')
         .upsert({
-          id: authUser.id,
-          display_name: authUser.user_metadata.full_name || authUser.email?.split('@')[0],
+          id: authUser.uid,
+          display_name: authUser.displayName || authUser.email?.split('@')[0],
           email: authUser.email,
-          photo_url: authUser.user_metadata.avatar_url,
+          photo_url: authUser.photoURL,
           role: role
         });
 
       if (upsertError) console.error("Profile sync error:", upsertError);
 
       setUser({
-        uid: authUser.id,
+        uid: authUser.uid,
         email: authUser.email,
-        displayName: authUser.user_metadata.full_name,
-        photoURL: authUser.user_metadata.avatar_url
+        displayName: authUser.displayName,
+        photoURL: authUser.photoURL
       });
       setUserRole(role);
     } catch (error) {
@@ -146,13 +140,8 @@ export default function App() {
 
   const handleLogin = async () => {
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: window.location.origin
-        }
-      });
-      if (error) throw error;
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
     } catch (error: any) {
       console.error("Login failed:", error);
       alert("Login failed: " + error.message);
@@ -160,7 +149,8 @@ export default function App() {
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    await signOut(auth);
+    setSupabaseToken(null);
     navigate('/');
   };
 
