@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabase';
+import { auth } from '../firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 export interface Pothole {
   id: string;
   latitude: number;
   longitude: number;
-  timestamp: string;
+  created_at: string;
+  timestamp?: string; // keep for backwards compat
   severity: 'low' | 'medium' | 'high';
   status: 'reported' | 'verified' | 'fixing' | 'resolved';
   report_image_url?: string;
@@ -23,43 +26,28 @@ export function usePotholes() {
     role: null
   });
 
+  // Listen to Firebase auth state
   useEffect(() => {
-    const fetchUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
         const { data: profile } = await supabase
           .from('users')
           .select('role')
-          .eq('id', user.id)
+          .eq('id', firebaseUser.uid)
           .single();
-        
-        setUserState({ uid: user.id, role: profile?.role || 'citizen' });
+        setUserState({ uid: firebaseUser.uid, role: profile?.role || 'citizen' });
       } else {
         setUserState({ uid: null, role: null });
-      }
-    };
-
-    fetchUser();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        const { data: profile } = await supabase
-          .from('users')
-          .select('role')
-          .eq('id', session.user.id)
-          .single();
-        setUserState({ uid: session.user.id, role: profile?.role || 'citizen' });
-      } else {
-        setUserState({ uid: null, role: null });
+        setPotholes([]);
+        setLoading(false);
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
     if (!userState.uid) {
-      setPotholes([]);
       setLoading(false);
       return;
     }
@@ -68,7 +56,7 @@ export function usePotholes() {
       let query = supabase
         .from('potholes')
         .select('*')
-        .order('timestamp', { ascending: false })
+        .order('created_at', { ascending: false })
         .limit(50);
 
       if (userState.role !== 'admin' && userState.role !== 'municipal') {
@@ -86,7 +74,6 @@ export function usePotholes() {
 
     fetchPotholes();
 
-    // Set up real-time subscription
     const channel = supabase
       .channel('potholes-changes')
       .on(
@@ -95,8 +82,8 @@ export function usePotholes() {
           event: '*',
           schema: 'public',
           table: 'potholes',
-          filter: userState.role !== 'admin' && userState.role !== 'municipal' 
-            ? `user_id=eq.${userState.uid}` 
+          filter: userState.role !== 'admin' && userState.role !== 'municipal'
+            ? `user_id=eq.${userState.uid}`
             : undefined
         },
         () => {
