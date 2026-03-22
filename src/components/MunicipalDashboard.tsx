@@ -149,7 +149,7 @@ export default function MunicipalDashboard({ potholes }: MunicipalDashboardProps
                           </div>
                           <div className="flex items-center gap-1.5 bg-black/40 px-2 py-1 rounded-md border border-zinc-800">
                             <Clock className="w-3 h-3 text-zinc-400" />
-                            <span>{new Date(p.timestamp).toLocaleString()}</span>
+                            <span>{new Date(p.created_at).toLocaleString()}</span>
                           </div>
                         </div>
                       </div>
