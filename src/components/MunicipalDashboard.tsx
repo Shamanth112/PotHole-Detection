@@ -2,60 +2,8 @@ import React, { useState, useRef } from 'react';
 import { Pothole } from '../hooks/usePotholes';
 import { MapPin, User, Navigation, Clock, ShieldAlert, CheckCircle2, Loader2, AlertCircle, Camera, Image as ImageIcon, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db, auth } from '../firebase';
+import { supabase } from '../supabase';
 import { uploadPotholeImage } from '../services/storageService';
-
-enum OperationType {
-  CREATE = 'create',
-  UPDATE = 'update',
-  DELETE = 'delete',
-  LIST = 'list',
-  GET = 'get',
-  WRITE = 'write',
-}
-
-interface FirestoreErrorInfo {
-  error: string;
-  operationType: OperationType;
-  path: string | null;
-  authInfo: {
-    userId: string | undefined;
-    email: string | null | undefined;
-    emailVerified: boolean | undefined;
-    isAnonymous: boolean | undefined;
-    tenantId: string | null | undefined;
-    providerInfo: {
-      providerId: string;
-      displayName: string | null;
-      email: string | null;
-      photoUrl: string | null;
-    }[];
-  }
-}
-
-function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
-  const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
-    authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
-      tenantId: auth.currentUser?.tenantId,
-      providerInfo: auth.currentUser?.providerData.map(provider => ({
-        providerId: provider.providerId,
-        displayName: provider.displayName,
-        email: provider.email,
-        photoUrl: provider.photoURL
-      })) || []
-    },
-    operationType,
-    path
-  }
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
-}
 
 interface MunicipalDashboardProps {
   potholes: Pothole[];
@@ -93,25 +41,31 @@ export default function MunicipalDashboard({ potholes }: MunicipalDashboardProps
     try {
       let resolvedImageUrl = '';
       if (newStatus === 'resolved' && selectedFile) {
-        resolvedImageUrl = await uploadPotholeImage(selectedFile, `resolved/${id}_${Date.now()}.jpg`);
+        try {
+          resolvedImageUrl = await uploadPotholeImage(selectedFile, `resolved/${id}_${Date.now()}.jpg`);
+        } catch (uploadError: any) {
+          console.error("Upload error:", uploadError);
+          throw new Error(`Photo upload failed: ${uploadError.message || 'Check storage permissions'}`);
+        }
       }
 
-      const potholeRef = doc(db, 'potholes', id);
       const updateData: any = { status: newStatus };
       if (resolvedImageUrl) {
-        updateData.resolvedImageUrl = resolvedImageUrl;
+        updateData.resolved_image_url = resolvedImageUrl;
       }
       
-      try {
-        await updateDoc(potholeRef, updateData);
-      } catch (error) {
-        handleFirestoreError(error, OperationType.UPDATE, `potholes/${id}`);
-      }
+      const { error } = await supabase
+        .from('potholes')
+        .update(updateData)
+        .eq('id', id);
+
+      if (error) throw error;
+
       setResolvingId(null);
       clearSelection();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating status:", error);
-      alert("Failed to update status. Please try again.");
+      alert(error.message || "Failed to update status. Please try again.");
     } finally {
       setUpdatingId(null);
     }
@@ -166,22 +120,22 @@ export default function MunicipalDashboard({ potholes }: MunicipalDashboardProps
                         <h3 className="font-bold text-lg text-white mb-1 group-hover:text-blue-400 transition-colors">
                           {p.address || `Pothole at ${p.latitude.toFixed(6)}, ${p.longitude.toFixed(6)}`}
                         </h3>
-                        {p.reportImageUrl && (
+                        {p.report_image_url && (
                           <div className="mt-2 mb-3">
                             <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1">Report Photo</p>
                             <img 
-                              src={p.reportImageUrl} 
+                              src={p.report_image_url} 
                               alt="Reported Pothole" 
                               className="w-32 h-32 object-cover rounded-xl border border-zinc-800"
                               referrerPolicy="no-referrer"
                             />
                           </div>
                         )}
-                        {p.resolvedImageUrl && (
+                        {p.resolved_image_url && (
                           <div className="mt-2 mb-3">
                             <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest mb-1">Resolution Photo</p>
                             <img 
-                              src={p.resolvedImageUrl} 
+                              src={p.resolved_image_url} 
                               alt="Resolved Pothole" 
                               className="w-32 h-32 object-cover rounded-xl border border-emerald-500/30"
                               referrerPolicy="no-referrer"
@@ -195,7 +149,7 @@ export default function MunicipalDashboard({ potholes }: MunicipalDashboardProps
                           </div>
                           <div className="flex items-center gap-1.5 bg-black/40 px-2 py-1 rounded-md border border-zinc-800">
                             <Clock className="w-3 h-3 text-zinc-400" />
-                            <span>{new Date(p.timestamp?.seconds * 1000).toLocaleString()}</span>
+                            <span>{new Date(p.timestamp).toLocaleString()}</span>
                           </div>
                         </div>
                       </div>
@@ -208,7 +162,7 @@ export default function MunicipalDashboard({ potholes }: MunicipalDashboardProps
                         </div>
                         <div>
                           <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Reported By</p>
-                          <p className="text-sm font-bold text-zinc-200">{p.userName || 'Anonymous Citizen'}</p>
+                          <p className="text-sm font-bold text-zinc-200">{p.user_name || 'Anonymous Citizen'}</p>
                         </div>
                       </div>
                       <div className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest ${

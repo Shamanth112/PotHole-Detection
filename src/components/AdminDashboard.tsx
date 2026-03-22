@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { db, auth } from '../firebase';
-import { collection, getDocs, doc, setDoc, deleteDoc, query, onSnapshot, orderBy, limit, Timestamp, addDoc } from 'firebase/firestore';
+import { supabase } from '../supabase';
 import { 
   UserPlus, Users, ShieldCheck, Mail, Trash2, Loader2, 
-  LayoutDashboard, MapPin, Plus, AlertTriangle, CheckCircle2, Clock, 
+  MapPin, Plus, AlertTriangle, CheckCircle2, Clock, 
   TrendingUp, BarChart3, Shield
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -22,7 +21,7 @@ export default function AdminDashboard() {
 
   // Permitted User Form State
   const [newEmail, setNewEmail] = useState('');
-  const [newRole, setNewRole] = useState<'user' | 'admin' | 'municipal'>('user');
+  const [newRole, setNewRole] = useState<'citizen' | 'admin' | 'municipal'>('citizen');
 
   // Pothole Form State
   const [showAddPothole, setShowAddPothole] = useState(false);
@@ -36,31 +35,56 @@ export default function AdminDashboard() {
   useEffect(() => {
     fetchUsers();
     
-    // Listen to potholes
-    const q = query(collection(db, 'potholes'), orderBy('timestamp', 'desc'), limit(100));
-    const unsubscribePotholes = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setPotholes(data);
-    });
+    // Initial fetch for potholes and permitted users
+    fetchPotholes();
+    fetchPermittedUsers();
 
-    // Listen to permitted users
-    const unsubscribePermitted = onSnapshot(collection(db, 'permitted_users'), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setPermittedUsers(data);
-    });
+    // Real-time subscriptions
+    const potholesChannel = supabase
+      .channel('admin-potholes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'potholes' }, () => {
+        fetchPotholes();
+      })
+      .subscribe();
+
+    const permittedChannel = supabase
+      .channel('admin-permitted')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'permitted_users' }, () => {
+        fetchPermittedUsers();
+      })
+      .subscribe();
 
     return () => {
-      unsubscribePotholes();
-      unsubscribePermitted();
+      supabase.removeChannel(potholesChannel);
+      supabase.removeChannel(permittedChannel);
     };
   }, []);
 
+  const fetchPotholes = async () => {
+    const { data, error } = await supabase
+      .from('potholes')
+      .select('*')
+      .order('timestamp', { ascending: false })
+      .limit(100);
+    if (!error && data) setPotholes(data);
+  };
+
+  const fetchPermittedUsers = async () => {
+    const { data, error } = await supabase
+      .from('permitted_users')
+      .select('*');
+    if (!error && data) setPermittedUsers(data);
+  };
+
   const fetchUsers = async () => {
     try {
-      const querySnapshot = await getDocs(collection(db, 'users'));
-      const usersList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      usersList.sort((a: any, b: any) => (a.email || '').localeCompare(b.email || ''));
-      setUsers(usersList);
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .order('email', { ascending: true });
+      
+      if (error) throw error;
+      setUsers(data || []);
     } catch (err) {
       console.error("Error fetching users:", err);
     }
@@ -74,11 +98,15 @@ export default function AdminDashboard() {
 
     try {
       const emailKey = newEmail.toLowerCase().trim();
-      await setDoc(doc(db, 'permitted_users', emailKey), {
-        email: emailKey,
-        role: newRole,
-        addedAt: new Date().toISOString()
-      });
+      const { error } = await supabase
+        .from('permitted_users')
+        .upsert({
+          email: emailKey,
+          role: newRole,
+          added_at: new Date().toISOString()
+        });
+
+      if (error) throw error;
 
       setNewEmail('');
       setSuccess(`Successfully added ${emailKey} as ${newRole}.`);
@@ -92,7 +120,12 @@ export default function AdminDashboard() {
   const handleDeletePermittedUser = async (email: string) => {
     if (!window.confirm(`Remove permissions for ${email}?`)) return;
     try {
-      await deleteDoc(doc(db, 'permitted_users', email));
+      const { error } = await supabase
+        .from('permitted_users')
+        .delete()
+        .eq('email', email);
+      
+      if (error) throw error;
       setSuccess(`Permissions removed for ${email}.`);
     } catch (err: any) {
       setError(`Failed to remove permissions: ${err.message}`);
@@ -103,7 +136,12 @@ export default function AdminDashboard() {
     if (!window.confirm(`Are you sure you want to delete ${user.email} from registered users?`)) return;
     setDeletingId(user.id);
     try {
-      await deleteDoc(doc(db, 'users', user.id));
+      const { error } = await supabase
+        .from('users')
+        .delete()
+        .eq('id', user.id);
+      
+      if (error) throw error;
       setSuccess(`User ${user.email} deleted.`);
       fetchUsers();
     } catch (err: any) {
@@ -117,16 +155,22 @@ export default function AdminDashboard() {
     e.preventDefault();
     setLoading(true);
     try {
-      await addDoc(collection(db, 'potholes'), {
-        latitude: parseFloat(newPothole.latitude),
-        longitude: parseFloat(newPothole.longitude),
-        severity: newPothole.severity,
-        address: newPothole.address || 'Manual Entry',
-        status: 'reported',
-        timestamp: Timestamp.now(),
-        userId: auth.currentUser?.uid || 'admin',
-        userName: 'Admin Manual Entry'
-      });
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from('potholes')
+        .insert({
+          latitude: parseFloat(newPothole.latitude),
+          longitude: parseFloat(newPothole.longitude),
+          severity: newPothole.severity,
+          address: newPothole.address || 'Manual Entry',
+          status: 'reported',
+          timestamp: new Date().toISOString(),
+          user_id: user?.id || null,
+          user_name: 'Admin Manual Entry'
+        });
+
+      if (error) throw error;
+
       setShowAddPothole(false);
       setNewPothole({ latitude: '', longitude: '', severity: 'medium', address: '' });
       setSuccess('Pothole manually added to system.');
@@ -140,7 +184,12 @@ export default function AdminDashboard() {
   const handleDeletePothole = async (id: string) => {
     if (!window.confirm('Delete this pothole report permanently?')) return;
     try {
-      await deleteDoc(doc(db, 'potholes', id));
+      const { error } = await supabase
+        .from('potholes')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
       setSuccess('Pothole report removed.');
     } catch (err: any) {
       setError(err.message);
@@ -268,7 +317,7 @@ export default function AdminDashboard() {
                     onChange={(e) => setNewRole(e.target.value as any)}
                     className="w-full bg-black border border-zinc-800 rounded-2xl py-3 px-4 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                   >
-                    <option value="user">Standard User (Citizen)</option>
+                    <option value="citizen">Standard User (Citizen)</option>
                     <option value="municipal">Municipal (Staff)</option>
                     <option value="admin">Administrator</option>
                   </select>
@@ -400,7 +449,7 @@ export default function AdminDashboard() {
                         <h4 className="text-sm font-bold text-white truncate">{p.address || 'Unknown Location'}</h4>
                         <div className="flex items-center gap-3 mt-1 text-[10px] font-bold text-zinc-500">
                           <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {p.latitude.toFixed(4)}, {p.longitude.toFixed(4)}</span>
-                          <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {new Date(p.timestamp?.seconds * 1000).toLocaleString()}</span>
+                          <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {new Date(p.timestamp).toLocaleString()}</span>
                           <span className={`px-2 py-0.5 rounded uppercase ${
                             p.status === 'resolved' ? 'bg-emerald-500/20 text-emerald-500' : 
                             p.status === 'fixing' ? 'bg-blue-500/20 text-blue-500' : 'bg-zinc-800 text-zinc-400'

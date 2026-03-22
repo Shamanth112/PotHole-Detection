@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Upload, MapPin, CheckCircle2, AlertTriangle, Info, ArrowLeft, Loader2, Camera, X } from 'lucide-react';
 import { motion } from 'motion/react';
 import { uploadPotholeImage } from '../services/storageService';
-import { auth } from '../firebase';
+import { supabase } from '../supabase';
 
 interface ReportViewProps {
   onBack: () => void;
@@ -71,8 +71,18 @@ export default function ReportView({ onBack, onSubmit }: ReportViewProps) {
     setIsSubmitting(true);
     
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("User not authenticated");
+
       const reportId = `report_${Date.now()}`;
-      const reportImageUrl = await uploadPotholeImage(selectedFile, `reports/${auth.currentUser?.uid}/${reportId}.jpg`);
+      let reportImageUrl = '';
+      
+      try {
+        reportImageUrl = await uploadPotholeImage(selectedFile, `reports/${user.id}/${reportId}.jpg`);
+      } catch (uploadError: any) {
+        console.error("Upload error:", uploadError);
+        throw new Error(`Photo upload failed: ${uploadError.message || 'Check storage permissions'}`);
+      }
 
       onSubmit({ 
         severity, 
@@ -82,9 +92,9 @@ export default function ReportView({ onBack, onSubmit }: ReportViewProps) {
         address: location?.address || 'Unknown Location',
         reportImageUrl
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error submitting report:", error);
-      alert("Failed to submit report. Please try again.");
+      alert(error.message || "Failed to submit report. Please try again.");
     } finally {
       setIsSubmitting(false);
     }

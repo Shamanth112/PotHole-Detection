@@ -1,8 +1,10 @@
 import React from 'react';
-import { Play, FileText, Activity, CheckCircle2, ShieldAlert, Wifi } from 'lucide-react';
+import { Play, FileText, Activity, CheckCircle2, ShieldAlert, Wifi, LayoutDashboard, ShieldCheck, ChevronRight } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useNavigate } from 'react-router-dom';
 
 interface HomeViewProps {
+  userRole: 'user' | 'admin' | 'municipal' | null;
   onStartDetection: () => void;
   onReportManually: () => void;
   stats: {
@@ -11,7 +13,8 @@ interface HomeViewProps {
   };
 }
 
-export default function HomeView({ onStartDetection, onReportManually, stats }: HomeViewProps) {
+export default function HomeView({ userRole, onStartDetection, onReportManually, stats }: HomeViewProps) {
+  const navigate = useNavigate();
   return (
     <div className="flex flex-col h-full bg-white">
       {/* Header */}
@@ -87,6 +90,48 @@ export default function HomeView({ onStartDetection, onReportManually, stats }: 
             </div>
 
             {/* Quick Tips */}
+            {(userRole === 'municipal' || userRole === 'admin') && (
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="bg-blue-600 p-6 rounded-3xl border border-blue-500 shadow-xl text-white flex flex-col gap-4"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                      <LayoutDashboard className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <p className="font-black text-sm uppercase italic tracking-tighter">Management Mode</p>
+                      <p className="text-[10px] font-bold text-blue-100/70 uppercase tracking-widest">Authorized Access</p>
+                    </div>
+                  </div>
+                  <ShieldCheck className="w-6 h-6 text-emerald-400" />
+                </div>
+                
+                <p className="text-xs text-blue-50/80 leading-relaxed font-medium">
+                  You have access to the municipal monitoring system. Track reports, update status, and manage road safety.
+                </p>
+
+                <div className="flex flex-col gap-2 pt-2">
+                  <button 
+                    onClick={() => navigate('/municipal')}
+                    className="w-full bg-white text-blue-600 py-3 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-blue-50 transition-all"
+                  >
+                    Open Municipal IDP <ChevronRight className="w-4 h-4" />
+                  </button>
+                  {userRole === 'admin' && (
+                    <button 
+                      onClick={() => navigate('/admin')}
+                      className="w-full bg-blue-700 text-white py-3 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-blue-800 transition-all border border-blue-500/50"
+                    >
+                      Admin Console <ChevronRight className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+            )}
+
             <div className="bg-zinc-50 p-6 rounded-3xl border border-zinc-200 flex items-start gap-4">
               <div className="w-10 h-10 bg-white rounded-xl border border-zinc-200 flex items-center justify-center shrink-0">
                 <Activity className="w-5 h-5 text-[#1a365d]" />

@@ -48,7 +48,7 @@ export default function PotholeList({ potholes }: PotholeListProps) {
                     </span>
                     <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#a0aec0] uppercase tracking-widest">
                       <Clock className="w-3 h-3" />
-                      <span>{new Date(p.timestamp?.seconds * 1000).toLocaleDateString()}</span>
+                      <span>{new Date(p.timestamp).toLocaleDateString()}</span>
                     </div>
                   </div>
                 </div>
@@ -57,19 +57,19 @@ export default function PotholeList({ potholes }: PotholeListProps) {
                   <h3 className="font-black text-[#1a365d] text-lg leading-tight tracking-tighter italic uppercase">
                     {p.address || `Pothole at ${p.latitude.toFixed(4)}, ${p.longitude.toFixed(4)}`}
                   </h3>
-                  <p className="text-xs text-[#718096] font-medium">Reported by {p.userName || 'Anonymous'}</p>
+                  <p className="text-xs text-[#718096] font-medium">Reported by {p.user_name || 'Anonymous'}</p>
                   
                   <div className="flex gap-2 mt-2 overflow-x-auto pb-2">
-                    {p.reportImageUrl && (
+                    {p.report_image_url && (
                       <div className="shrink-0">
                         <p className="text-[8px] font-black text-[#a0aec0] uppercase tracking-widest mb-1">Report</p>
-                        <img src={p.reportImageUrl} className="w-20 h-20 object-cover rounded-xl border border-[#e2e8f0]" alt="Report" referrerPolicy="no-referrer" />
+                        <img src={p.report_image_url} className="w-20 h-20 object-cover rounded-xl border border-[#e2e8f0]" alt="Report" referrerPolicy="no-referrer" />
                       </div>
                     )}
-                    {p.resolvedImageUrl && (
+                    {p.resolved_image_url && (
                       <div className="shrink-0">
                         <p className="text-[8px] font-black text-emerald-500 uppercase tracking-widest mb-1">Resolved</p>
-                        <img src={p.resolvedImageUrl} className="w-20 h-20 object-cover rounded-xl border border-emerald-500/30" alt="Resolved" referrerPolicy="no-referrer" />
+                        <img src={p.resolved_image_url} className="w-20 h-20 object-cover rounded-xl border border-emerald-500/30" alt="Resolved" referrerPolicy="no-referrer" />
                       </div>
                     )}
                   </div>

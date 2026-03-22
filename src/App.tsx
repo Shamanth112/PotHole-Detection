@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { auth, db } from './firebase';
-import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, User, updateProfile } from 'firebase/auth';
-import { doc, setDoc, getDoc, collection, addDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { supabase } from './supabase';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import HomeView from './components/HomeView';
 import ReportView from './components/ReportView';
@@ -37,8 +35,8 @@ import { uploadPotholeImage } from './services/storageService';
 type Tab = 'home' | 'map' | 'history' | 'scan' | 'profile' | 'report';
 
 export default function App() {
-  const [user, setUser] = useState<User | null>(null);
-  const [userRole, setUserRole] = useState<'user' | 'admin' | 'municipal' | null>(null);
+  const [user, setUser] = useState<any | null>(null);
+  const [userRole, setUserRole] = useState<'citizen' | 'admin' | 'municipal' | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('home');
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -71,74 +69,98 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const initAuth = async () => {
       try {
-        if (user) {
-          const userRef = doc(db, 'users', user.uid);
-          const userSnap = await getDoc(userRef);
-          let role: 'user' | 'admin' | 'municipal' = 'user';
-          
-          const isDefaultAdmin = user.email === "shamanth.p2007@gmail.com";
-          
-          // Check permitted_users collection for assigned role
-          const permittedRef = doc(db, 'permitted_users', user.email?.toLowerCase().trim() || '');
-          const permittedSnap = await getDoc(permittedRef);
-          
-          if (permittedSnap.exists()) {
-            role = permittedSnap.data().role;
-          } else if (isDefaultAdmin) {
-            role = 'admin';
-          }
-
-          // Sync with users collection
-          await setDoc(userRef, {
-            uid: user.uid,
-            displayName: user.displayName,
-            email: user.email,
-            photoURL: user.photoURL,
-            role: role
-          }, { merge: true });
-
-          setUser(user);
-          setUserRole(role);
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          await syncUserProfile(session.user);
         } else {
           setUser(null);
           setUserRole(null);
         }
-      } catch (error: any) {
-        console.error("Auth state change error:", error);
+      } catch (error) {
+        console.error("Auth init error:", error);
       } finally {
         setLoading(false);
       }
+    };
+
+    initAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        await syncUserProfile(session.user);
+      } else {
+        setUser(null);
+        setUserRole(null);
+      }
+      setLoading(false);
     });
-    return () => unsubscribe();
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const handleLogin = async () => {
-    const provider = new GoogleAuthProvider();
+  const syncUserProfile = async (authUser: any) => {
     try {
-      await signInWithPopup(auth, provider);
-    } catch (error: any) {
-      // Ignore common user-cancellation errors
-      if (
-        error.code === 'auth/popup-closed-by-user' || 
-        error.code === 'auth/cancelled-popup-request'
-      ) {
-        return;
+      let role: 'citizen' | 'admin' | 'municipal' = 'citizen';
+      const email = authUser.email?.toLowerCase().trim() || '';
+      const isDefaultAdmin = email === "shamanth.p2007@gmail.com";
+
+      // Check permitted_users table
+      const { data: permittedUser } = await supabase
+        .from('permitted_users')
+        .select('role')
+        .eq('email', email)
+        .single();
+
+      if (permittedUser) {
+        role = permittedUser.role;
+      } else if (isDefaultAdmin) {
+        role = 'admin';
       }
 
-      console.error("Login failed:", error);
-      
-      if (error.code === 'auth/unauthorized-domain') {
-        alert("Domain not authorized! Please add your Vercel URL to the 'Authorized domains' list in the Firebase Console (Authentication > Settings).");
-      } else {
-        alert("Login failed: " + error.message);
-      }
+      // Upsert user profile
+      const { error: upsertError } = await supabase
+        .from('users')
+        .upsert({
+          id: authUser.id,
+          display_name: authUser.user_metadata.full_name || authUser.email?.split('@')[0],
+          email: authUser.email,
+          photo_url: authUser.user_metadata.avatar_url,
+          role: role
+        });
+
+      if (upsertError) console.error("Profile sync error:", upsertError);
+
+      setUser({
+        uid: authUser.id,
+        email: authUser.email,
+        displayName: authUser.user_metadata.full_name,
+        photoURL: authUser.user_metadata.avatar_url
+      });
+      setUserRole(role);
+    } catch (error) {
+      console.error("Error syncing user profile:", error);
     }
   };
 
-  const handleLogout = () => {
-    auth.signOut();
+  const handleLogin = async () => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin
+        }
+      });
+      if (error) throw error;
+    } catch (error: any) {
+      console.error("Login failed:", error);
+      alert("Login failed: " + error.message);
+    }
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     navigate('/');
   };
 
@@ -148,15 +170,16 @@ export default function App() {
 
     try {
       const photoURL = await uploadPotholeImage(file, `profiles/${user.uid}_${Date.now()}.jpg`);
-      await updateProfile(user, { photoURL });
       
-      // Update Firestore user doc as well
-      await updateDoc(doc(db, 'users', user.uid), { photoURL });
+      // Update Supabase users table
+      const { error } = await supabase
+        .from('users')
+        .update({ photo_url: photoURL })
+        .eq('id', user.uid);
       
-      // Force refresh user state
-      const updatedUser = auth.currentUser;
-      if (updatedUser) setUser({ ...updatedUser });
+      if (error) throw error;
       
+      setUser((prev: any) => prev ? { ...prev, photoURL } : null);
       alert("Profile photo updated successfully!");
     } catch (error) {
       console.error("Error uploading profile photo:", error);
@@ -167,13 +190,21 @@ export default function App() {
   const handleReportPothole = async (data: { latitude: number; longitude: number; severity: string; address?: string; reportImageUrl?: string }, isAuto = false) => {
     if (!user) return;
     try {
-      await addDoc(collection(db, 'potholes'), {
-        ...data,
-        userId: user.uid,
-        userName: user.displayName || 'Road Guardian',
-        status: 'reported',
-        timestamp: serverTimestamp(),
-      });
+      const { error } = await supabase
+        .from('potholes')
+        .insert({
+          latitude: data.latitude,
+          longitude: data.longitude,
+          severity: data.severity,
+          address: data.address,
+          report_image_url: data.reportImageUrl,
+          user_id: user.uid,
+          user_name: user.displayName || 'Road Guardian',
+          status: 'reported',
+          timestamp: new Date().toISOString()
+        });
+
+      if (error) throw error;
       
       if (!isAuto) {
         setActiveTab('history');
@@ -380,7 +411,7 @@ export default function App() {
                       stats={{
                         detectedToday: potholes.filter(p => {
                           const today = new Date();
-                          const pDate = new Date(p.timestamp?.seconds * 1000);
+                          const pDate = new Date(p.timestamp);
                           return pDate.toDateString() === today.toDateString();
                         }).length,
                         fixedThisWeek: potholes.filter(p => p.status === 'resolved').length
