@@ -48,9 +48,12 @@ export async function loadModel(): Promise<void> {
   if (session || modelLoadFailed) return;
 
   try {
-    // Use WASM backend — works in all modern browsers without WebGL requirements
-    ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.18.0/dist/';
-    ort.env.wasm.numThreads = navigator.hardwareConcurrency > 1 ? 2 : 1;
+    // Serve WASM from the local public/ folder (copied at build time)
+    // This avoids CDN version mismatches and works offline / on Vercel
+    ort.env.wasm.wasmPaths = '/';
+    // SharedArrayBuffer (needed for multi-thread) requires COOP/COEP headers.
+    // Vercel doesn't set those by default, so force single-thread to be safe.
+    ort.env.wasm.numThreads = 1;
 
     console.log(`[YOLO] Loading model from: ${MODEL_URL}`);
     session = await ort.InferenceSession.create(MODEL_URL, {
