@@ -119,7 +119,7 @@ export default function CameraView({ onDetection, onBack, gpsActive, userLocatio
     const W = canvas.width, H = canvas.height;
     const scaleX = W / (video.videoWidth || 1);
     const scaleY = H / (video.videoHeight || 1);
-    const ROI_Y = H * 0.42;
+    const ROI_Y = H * 0.25;
 
     ctx.clearRect(0, 0, W, H);
 
@@ -200,8 +200,8 @@ export default function CameraView({ onDetection, onBack, gpsActive, userLocatio
         detectPotholes(video).then(results => {
           const videoH = video.videoHeight || 1;
           const filtered = results.filter(d =>
-            d.class === 'pothole' && d.score >= 0.40 &&
-            (d.bbox[1] + d.bbox[3] / 2) / videoH > 0.42
+            d.class === 'pothole' && d.score >= 0.25 &&
+            (d.bbox[1] + d.bbox[3] / 2) / videoH > 0.25
           );
           lastDetectionsRef.current = results;
           setLiveDetections(filtered);
@@ -409,7 +409,7 @@ export default function CameraView({ onDetection, onBack, gpsActive, userLocatio
         </div>
 
         {/* ── Road zone label ── */}
-        <div className="absolute pointer-events-none z-10" style={{ top: '42%', left: 0, right: 0 }}>
+        <div className="absolute pointer-events-none z-10" style={{ top: '25%', left: 0, right: 0 }}>
           <div className="flex items-center justify-center">
             <span className="px-3 py-0.5 bg-blue-500/20 border border-blue-500/30 rounded-full text-[8px] font-black text-blue-300 uppercase tracking-widest">
               ▼ Road Patrol Zone ▼
@@ -419,7 +419,7 @@ export default function CameraView({ onDetection, onBack, gpsActive, userLocatio
 
         {/* ── Scanning line ── */}
         <motion.div
-          animate={{ top: ['42%', '100%', '42%'] }}
+          animate={{ top: ['25%', '100%', '25%'] }}
           transition={{ duration: 3.2, repeat: Infinity, ease: 'linear' }}
           className="absolute left-0 right-0 h-px z-10 pointer-events-none"
           style={{ background: 'linear-gradient(90deg,transparent,rgba(239,68,68,0.55),transparent)', boxShadow: '0 0 10px 2px rgba(239,68,68,0.25)' }}

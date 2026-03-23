@@ -28,13 +28,14 @@ const POTHOLE_CLASS_IDX = parseInt(
 );
 
 const INPUT_SIZE = 640; // YOLOv8 default input resolution
-const CONF_THRESHOLD = 0.40; // Minimum detection confidence
+const CONF_THRESHOLD = 0.25; // Minimum detection confidence (lowered for better recall)
 const IOU_THRESHOLD = 0.45;  // NMS IoU threshold
 
 // ── Globals ──────────────────────────────────────────────────────────────────
 let session: ort.InferenceSession | null = null;
 let modelLoadFailed = false;
 let modelLoadError = '';
+let loggedShapeOnce = false; // only log output shape once to avoid spam
 
 // ── Public types ─────────────────────────────────────────────────────────────
 export interface Detection {
@@ -174,13 +175,41 @@ export async function detectPotholes(video: HTMLVideoElement): Promise<Detection
   try {
     const results = await session.run(feeds);
     const output = results[session.outputNames[0]];
-    outputData = output.data as Float32Array;
+    const rawData = output.data as Float32Array;
+    const dims = output.dims; // e.g. [1, 5, 8400] or [1, 8400, 5]
 
-    // YOLOv8 output shape: [1, 4+numClasses, 8400]
-    // Transposed vs YOLOv5: each column is a candidate box
-    const dims = output.dims; // [1, num_params, num_anchors]
-    numDetections = dims[2];  // 8400 anchor candidates
-    numClasses = dims[1] - 4; // subtract 4 bbox params
+    if (!loggedShapeOnce) {
+      console.log(`[YOLO] Output shape: [${dims.join(', ')}]`);
+      loggedShapeOnce = true;
+    }
+
+    // Auto-detect output layout:
+    //   YOLOv8 default: [1, 4+nc, N]  (dims[1] small, dims[2] large)
+    //   YOLOv5 / some exports: [1, N, 4+nc]  (dims[1] large, dims[2] small)
+    if (dims.length === 3 && dims[1] > dims[2]) {
+      // Likely [1, N, 4+nc] → transpose to [1, 4+nc, N]
+      const rows = dims[1]; // N (e.g. 8400)
+      const cols = dims[2]; // 4+nc (e.g. 5)
+      console.log(`[YOLO] Detected NON-transposed layout [1, ${rows}, ${cols}] → transposing to [1, ${cols}, ${rows}]`);
+      outputData = new Float32Array(rawData.length);
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          outputData[c * rows + r] = rawData[r * cols + c];
+        }
+      }
+      numDetections = rows;
+      numClasses = cols - 4;
+    } else {
+      // Already [1, 4+nc, N] (YOLOv8 default)
+      outputData = rawData;
+      numDetections = dims[2];  // N anchor candidates
+      numClasses = dims[1] - 4; // subtract 4 bbox params
+    }
+
+    if (numClasses <= 0) {
+      console.error(`[YOLO] Invalid numClasses=${numClasses} from dims=[${dims.join(',')}]. Model may be incompatible.`);
+      return [];
+    }
   } catch (err) {
     console.error('[YOLO] Inference error:', err);
     return [];
@@ -238,13 +267,19 @@ export async function detectPotholes(video: HTMLVideoElement): Promise<Detection
     rawScores.push(maxScore);
   }
 
+  // Diagnostic logging (throttled to ~every 30th call via frame skip in CameraView)
   if (rawBoxes.length === 0) {
+    console.log(`[YOLO] 0 detections above threshold ${CONF_THRESHOLD} out of ${numDetections} candidates`);
     smoothed.clear();
     return [];
+  } else {
+    console.log(`[YOLO] ${rawBoxes.length} raw detections above threshold ${CONF_THRESHOLD}`);
   }
 
   // ── NMS ──
   const kept = nms(rawBoxes, rawScores, IOU_THRESHOLD);
+  console.log(`[YOLO] After NMS: ${kept.length} detections (scores: ${kept.map(i => rawScores[i].toFixed(2)).join(', ')})`);
+
 
   // ── Convert to Detection[] with temporal smoothing ──
   const results: Detection[] = kept.map((idx, slotIdx) => {
