@@ -2,7 +2,7 @@
 
 -- 1. Users table (Extends Supabase Auth)
 CREATE TABLE IF NOT EXISTS public.users (
-  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  id TEXT PRIMARY KEY,
   email TEXT UNIQUE NOT NULL,
   full_name TEXT,
   avatar_url TEXT,
@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS public.permitted_users (
 -- 3. Potholes table
 CREATE TABLE IF NOT EXISTS public.potholes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+  user_id TEXT REFERENCES public.users(id) ON DELETE SET NULL,
   latitude DOUBLE PRECISION NOT NULL,
   longitude DOUBLE PRECISION NOT NULL,
   address TEXT,
