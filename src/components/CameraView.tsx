@@ -1,9 +1,11 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { loadModel, detectPotholes, isModelLoaded, getModelError, Detection } from '../services/detectionService';
-import { auth } from '../firebase';
+import { useConvex } from 'convex/react';
 import { Camera, AlertTriangle, ShieldCheck, ArrowLeft, Zap, Activity, PackageOpen, MapPin, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { uploadPotholeImageFromBlob } from '../services/storageService';
+import { uploadToConvex } from '../services/storageService';
+import { api } from '../../convex/_generated/api';
+import { Id } from '../../convex/_generated/dataModel';
 
 interface CameraViewProps {
   onDetection: (detection: Detection, imageUrl: string) => void;
@@ -51,6 +53,7 @@ interface SessionReport {
 }
 
 export default function CameraView({ onDetection, onBack, gpsActive, userLocation }: CameraViewProps) {
+  const convex = useConvex();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animFrameRef = useRef<number>(0);
@@ -233,8 +236,7 @@ export default function CameraView({ onDetection, onBack, gpsActive, userLocatio
 
   // ── Capture + report ──────────────────────────────────────────────────────
   const captureAndReport = async (detection: Detection) => {
-    const firebaseUser = auth.currentUser;
-    if (!firebaseUser || !videoRef.current || isUploading) return;
+    if (!videoRef.current || isUploading) return;
 
     setIsUploading(true);
     setShowShutter(true);
@@ -255,9 +257,9 @@ export default function CameraView({ onDetection, onBack, gpsActive, userLocatio
       const blob = await new Promise<Blob | null>(r => cap.toBlob(r, 'image/jpeg', 0.85));
       if (!blob) return;
 
-      const url = await uploadPotholeImageFromBlob(
-        blob, `reports/${firebaseUser.uid}/ai_${Date.now()}.jpg`
-      );
+      const storageId = await uploadToConvex(convex, blob);
+      const url = await convex.query(api.storage.getImageUrl, { storageId: storageId as Id<"_storage"> }) as string;
+      
       onDetection(detection, url);
 
       const conf = Math.round(detection.score * 100);

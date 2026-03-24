@@ -109,7 +109,7 @@ export default function MapView({ potholes, onAddReport }: MapViewProps) {
 
             {filteredPotholes.map((p) => (
               <PotholeMarker 
-                key={p.id} 
+                key={p._id} 
                 pothole={p} 
                 onSelect={() => setSelectedPothole(p)} 
               />
@@ -133,11 +133,11 @@ export default function MapView({ potholes, onAddReport }: MapViewProps) {
                   <div className="space-y-1 text-xs text-zinc-600">
                     <div className="flex items-center gap-1.5">
                       <User className="w-3 h-3" />
-                      <span className="font-medium">{selectedPothole.user_name || 'Anonymous Reporter'}</span>
+                      <span className="font-medium">{selectedPothole.userName || 'Anonymous Reporter'}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <Calendar className="w-3 h-3" />
-                      <span>{new Date(selectedPothole.timestamp).toLocaleString()}</span>
+                      <span>{new Date(selectedPothole._creationTime).toLocaleString()}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <Navigation className="w-3 h-3" />

@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { Pothole } from '../hooks/usePotholes';
 import { MapPin, Clock, ChevronRight, AlertTriangle, Info, Trash2, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { supabase } from '../supabase';
+import { useMutation } from 'convex/react';
+import { api } from '../../convex/_generated/api';
 import ImageViewer from './ImageViewer';
+import { Id } from '../../convex/_generated/dataModel';
 
 interface PotholeListProps {
   potholes: Pothole[];
@@ -14,16 +16,17 @@ export default function PotholeList({ potholes }: PotholeListProps) {
   const [localPotholes, setLocalPotholes] = useState<Pothole[] | null>(null);
   const [viewingImage, setViewingImage] = useState<{url: string, title: string} | null>(null);
 
+  const deletePotholeMutation = useMutation(api.potholes.deletePothole);
+
   const displayPotholes = localPotholes ?? potholes;
 
   const handleDelete = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this report? This cannot be undone.')) return;
     setDeletingId(id);
     try {
-      const { error } = await supabase.from('potholes').delete().eq('id', id);
-      if (error) throw error;
+      await deletePotholeMutation({ potholeId: id as Id<"potholes"> });
       // Optimistically remove from local list
-      setLocalPotholes((prev) => (prev ?? potholes).filter((p) => p.id !== id));
+      setLocalPotholes((prev) => (prev ?? potholes).filter((p) => p._id !== id));
     } catch (err: any) {
       alert('Failed to delete: ' + err.message);
     } finally {
@@ -56,7 +59,7 @@ export default function PotholeList({ potholes }: PotholeListProps) {
             <AnimatePresence>
               {displayPotholes.map((p) => (
                 <motion.div
-                  key={p.id}
+                  key={p._id}
                   layout
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -81,7 +84,7 @@ export default function PotholeList({ potholes }: PotholeListProps) {
                       </span>
                       <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#a0aec0] uppercase tracking-widest">
                         <Clock className="w-3 h-3" />
-                        <span>{new Date(p.created_at).toLocaleDateString()}</span>
+                        <span>{new Date(p._creationTime).toLocaleDateString()}</span>
                       </div>
                     </div>
                   </div>
@@ -90,19 +93,19 @@ export default function PotholeList({ potholes }: PotholeListProps) {
                     <h3 className="font-black text-[#1a365d] text-lg leading-tight tracking-tighter italic uppercase">
                       {p.address || `Pothole at ${p.latitude.toFixed(4)}, ${p.longitude.toFixed(4)}`}
                     </h3>
-                    <p className="text-xs text-[#718096] font-medium">Reported by {p.user_name || 'Anonymous'}</p>
+                    <p className="text-xs text-[#718096] font-medium">Reported by {p.userName || 'Anonymous'}</p>
                     
                     <div className="flex gap-2 mt-2 overflow-x-auto pb-2">
-                      {p.report_image_url && (
-                        <div className="shrink-0 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setViewingImage({url: p.report_image_url!, title: 'Report Photo'})}>
+                      {p.reportImageUrl && (
+                        <div className="shrink-0 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setViewingImage({url: p.reportImageUrl!, title: 'Report Photo'})}>
                           <p className="text-[8px] font-black text-[#a0aec0] uppercase tracking-widest mb-1">Report</p>
-                          <img src={p.report_image_url} className="w-20 h-20 object-cover rounded-xl border border-[#e2e8f0]" alt="Report" referrerPolicy="no-referrer" />
+                          <img src={p.reportImageUrl} className="w-20 h-20 object-cover rounded-xl border border-[#e2e8f0]" alt="Report" referrerPolicy="no-referrer" />
                         </div>
                       )}
-                      {p.resolved_image_url && (
-                        <div className="shrink-0 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setViewingImage({url: p.resolved_image_url!, title: 'Resolved Photo'})}>
+                      {p.resolvedImageUrl && (
+                        <div className="shrink-0 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setViewingImage({url: p.resolvedImageUrl!, title: 'Resolved Photo'})}>
                           <p className="text-[8px] font-black text-emerald-500 uppercase tracking-widest mb-1">Resolved</p>
-                          <img src={p.resolved_image_url} className="w-20 h-20 object-cover rounded-xl border border-emerald-500/30" alt="Resolved" referrerPolicy="no-referrer" />
+                          <img src={p.resolvedImageUrl} className="w-20 h-20 object-cover rounded-xl border border-emerald-500/30" alt="Resolved" referrerPolicy="no-referrer" />
                         </div>
                       )}
                     </div>
@@ -148,16 +151,16 @@ export default function PotholeList({ potholes }: PotholeListProps) {
 
                   {/* Delete Button */}
                   <button
-                    onClick={() => handleDelete(p.id)}
-                    disabled={deletingId === p.id}
+                    onClick={() => handleDelete(p._id)}
+                    disabled={deletingId === p._id}
                     className="w-full mt-2 flex items-center justify-center gap-2 py-2.5 rounded-2xl border-2 border-red-100 text-red-500 hover:bg-red-50 hover:border-red-200 transition-all text-xs font-black uppercase tracking-widest disabled:opacity-50"
                   >
-                    {deletingId === p.id ? (
+                    {deletingId === p._id ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
                     ) : (
                       <Trash2 className="w-4 h-4" />
                     )}
-                    {deletingId === p.id ? 'Deleting...' : 'Delete Report'}
+                    {deletingId === p._id ? 'Deleting...' : 'Delete Report'}
                   </button>
 
                   <div className="absolute bottom-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity">
