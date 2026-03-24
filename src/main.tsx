@@ -39,20 +39,29 @@ if (!convexUrl || convexUrl === 'undefined') {
     throw err;
   }
   
-  console.log("DEBUG: Rendering App...");
+  console.log("DEBUG: Rendering Minimal Test...");
   try {
     createRoot(rootElement).render(
-      <StrictMode>
-        <ConvexAuthProvider client={convex}>
-          <BrowserRouter>
-            <App />
-          </BrowserRouter>
-        </ConvexAuthProvider>
-      </StrictMode>
+      <div style={{ padding: '100px', textAlign: 'center' }}>
+        <h1 style={{ color: 'blue', fontSize: '48px' }}>CONVEX APP TEST: {convexUrl}</h1>
+        <p>If you see this, React is rendering correctly!</p>
+      </div>
     );
-    console.log("DEBUG: Render call complete");
+    console.log("DEBUG: Minimal render call complete");
   } catch (renderErr: any) {
-    console.log("DEBUG: Render call crashed:", renderErr);
+    console.log("DEBUG: Minimal render call crashed:", renderErr);
     document.body.innerHTML = `<h1 style="color:red">REACT RENDER CRASH: ${renderErr.message}</h1>`;
   }
+  
+  /*
+  createRoot(rootElement).render(
+    <StrictMode>
+      <ConvexAuthProvider client={convex}>
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+      </ConvexAuthProvider>
+    </StrictMode>
+  );
+  */
 }
