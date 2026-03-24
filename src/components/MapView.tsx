@@ -3,7 +3,7 @@ import { APIProvider, Map, AdvancedMarker, Pin, InfoWindow, useAdvancedMarkerRef
 import { Pothole } from '../hooks/usePotholes';
 import { MapPin, Calendar, User, Navigation, LocateFixed, Filter, Plus } from 'lucide-react';
 
-const API_KEY = process.env.GOOGLE_MAPS_PLATFORM_KEY || '';
+const API_KEY = (import.meta.env.VITE_GOOGLE_MAPS_PLATFORM_KEY as string) || '';
 const hasValidKey = Boolean(API_KEY) && API_KEY !== 'YOUR_API_KEY';
 
 interface MapViewProps {
@@ -49,7 +49,7 @@ export default function MapView({ potholes, onAddReport }: MapViewProps) {
         <MapPin className="w-12 h-12 mb-4 text-zinc-600" />
         <h2 className="text-xl font-bold mb-2">Google Maps Key Required</h2>
         <p className="text-zinc-400 text-sm max-w-xs">
-          Please add your <code>GOOGLE_MAPS_PLATFORM_KEY</code> to the AI Studio Secrets to enable the map view.
+          Please add your <code>VITE_GOOGLE_MAPS_PLATFORM_KEY</code> to the Environment Variables to enable the map view.
         </p>
       </div>
     );

@@ -18,7 +18,20 @@ if (!convexUrl) {
     </div>
   );
 } else {
-  const convex = new ConvexReactClient(convexUrl);
+  let convex: ConvexReactClient;
+  try {
+    convex = new ConvexReactClient(convexUrl);
+  } catch (err: any) {
+    createRoot(rootElement).render(
+      <div style={{ padding: '40px', fontFamily: 'sans-serif', color: 'red' }}>
+        <h2>Deployment Error: Invalid VITE_CONVEX_URL</h2>
+        <p>The URL provided (<code>{convexUrl}</code>) is not a valid URL.</p>
+        <p>Error details: {err.message}</p>
+        <p>Make sure VITE_CONVEX_URL starts with <code>https://</code>.</p>
+      </div>
+    );
+    throw err; // Stop execution
+  }
   
   createRoot(rootElement).render(
     <StrictMode>
