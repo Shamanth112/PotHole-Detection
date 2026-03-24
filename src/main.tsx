@@ -1,5 +1,4 @@
-console.log("HELLO VERCEL DEBUG 2");
-import { StrictMode } from 'react';
+import { StrictMode, Component, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { ConvexAuthProvider } from '@convex-dev/auth/react';
@@ -39,29 +38,49 @@ if (!convexUrl || convexUrl === 'undefined') {
     throw err;
   }
   
-  console.log("DEBUG: Rendering Minimal Test...");
+  console.log("DEBUG: Restoring Full App...");
+  
+  // A simple Error Boundary component
+  class ErrorBoundary extends Component<{children: ReactNode}, {hasError: boolean, error: any}> {
+    constructor(props: {children: ReactNode}) { 
+      super(props); 
+      this.state = { hasError: false, error: null }; 
+    }
+    static getDerivedStateFromError(error: any) { 
+      return { hasError: true, error }; 
+    }
+    componentDidCatch(error: any, errorInfo: any) { 
+      console.error("REACT BOUNDARY CAUGHT:", error, errorInfo); 
+    }
+    render() {
+      if (this.state.hasError) {
+        return (
+          <div style={{ padding: '40px', background: 'white', color: 'red', border: '10px solid red', zIndex: 9999, position: 'relative' }}>
+            <h1>Something went wrong in the App.</h1>
+            <pre style={{ whiteSpace: 'pre-wrap', background: '#fee', padding: '10px' }}>
+              {this.state.error?.toString() || 'Unknown error'}
+            </pre>
+            <p>Check the browser console for more details.</p>
+          </div>
+        );
+      }
+      return this.props.children;
+    }
+  }
+
   try {
     createRoot(rootElement).render(
-      <div style={{ padding: '100px', textAlign: 'center' }}>
-        <h1 style={{ color: 'blue', fontSize: '48px' }}>CONVEX APP TEST: {convexUrl}</h1>
-        <p>If you see this, React is rendering correctly!</p>
-      </div>
+      <ErrorBoundary>
+        <ConvexAuthProvider client={convex}>
+          <BrowserRouter>
+            <App />
+          </BrowserRouter>
+        </ConvexAuthProvider>
+      </ErrorBoundary>
     );
-    console.log("DEBUG: Minimal render call complete");
+    console.log("DEBUG: Full app render call complete");
   } catch (renderErr: any) {
-    console.log("DEBUG: Minimal render call crashed:", renderErr);
+    console.log("DEBUG: Full app render call crashed:", renderErr);
     document.body.innerHTML = `<h1 style="color:red">REACT RENDER CRASH: ${renderErr.message}</h1>`;
   }
-  
-  /*
-  createRoot(rootElement).render(
-    <StrictMode>
-      <ConvexAuthProvider client={convex}>
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
-      </ConvexAuthProvider>
-    </StrictMode>
-  );
-  */
 }
