@@ -1,45 +1,27 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { Pothole } from '../hooks/usePotholes';
-import { MapPin, User, Navigation, Clock, ShieldAlert, CheckCircle2, Loader2, AlertCircle, Camera, Image as ImageIcon, X, RefreshCw } from 'lucide-react';
+import { MapPin, User, Navigation, Clock, ShieldAlert, CheckCircle2, Loader2, AlertCircle, Camera, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { supabase } from '../supabase';
-import { uploadPotholeImage } from '../services/storageService';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '../../convex/_generated/api';
+import { useConvex } from 'convex/react';
+import { uploadToConvex } from '../services/storageService';
 import ImageViewer from './ImageViewer';
+import { Id } from '../../convex/_generated/dataModel';
 
 interface MunicipalDashboardProps {
-  potholes?: Pothole[]; // now optional, kept for backward compat
+  potholes?: Pothole[]; // Kept for backward compat, but we use the query directly below
 }
 
 export default function MunicipalDashboard({ potholes: propPotholes }: MunicipalDashboardProps) {
-  const [allPotholes, setAllPotholes] = useState<Pothole[]>([]);
-  const [fetchLoading, setFetchLoading] = useState(true);
+  const convex = useConvex();
+  const potholesQuery = useQuery(api.potholes.listAll);
+  const potholes = potholesQuery ?? (propPotholes || []);
+  const fetchLoading = potholesQuery === undefined;
+
+  const updateStatusMutation = useMutation(api.potholes.updateStatus);
+
   const [viewingImage, setViewingImage] = useState<{url: string, title: string} | null>(null);
-
-  // Fetch ALL potholes directly — never filter by user
-  const fetchAll = async () => {
-    const { data, error } = await supabase
-      .from('potholes')
-      .select('*')
-      .order('created_at', { ascending: false });
-    if (!error && data) setAllPotholes(data);
-    setFetchLoading(false);
-  };
-
-  useEffect(() => {
-    fetchAll();
-    const channel = supabase
-      .channel('municipal-potholes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'potholes' }, () => {
-        fetchAll();
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, []);
-
-  // Use directly-fetched data; fall back to prop only if still loading
-  const potholes = fetchLoading ? (propPotholes || []) : allPotholes;
-
-
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -61,38 +43,33 @@ export default function MunicipalDashboard({ potholes: propPotholes }: Municipal
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const updateStatus = async (id: string, newStatus: Pothole['status']) => {
-    if (newStatus === 'resolved' && !selectedFile && resolvingId !== id) {
-      setResolvingId(id);
+  const updateStatus = async (id: Id<"potholes">, newStatus: Pothole['status']) => {
+    if (newStatus === 'resolved' && !selectedFile && resolvingId !== (id as string)) {
+      setResolvingId(id as string);
       return;
     }
 
-    setUpdatingId(id);
+    setUpdatingId(id as string);
     try {
-      let resolvedImageUrl = '';
+      let resolvedImageId: string | undefined;
+      let resolvedImageUrl: string | undefined;
+
       if (newStatus === 'resolved' && selectedFile) {
         try {
-          resolvedImageUrl = await uploadPotholeImage(selectedFile, `resolved/${id}_${Date.now()}.jpg`);
+          resolvedImageId = await uploadToConvex(convex, selectedFile);
+          resolvedImageUrl = await convex.query(api.storage.getImageUrl, { storageId: resolvedImageId as Id<"_storage"> }) as string;
         } catch (uploadError: any) {
           console.error("Upload error:", uploadError);
           throw new Error(`Photo upload failed: ${uploadError.message || 'Check storage permissions'}`);
         }
       }
 
-      const updateData: any = { status: newStatus };
-      if (resolvedImageUrl) {
-        updateData.resolved_image_url = resolvedImageUrl;
-      }
-      
-      const { error } = await supabase
-        .from('potholes')
-        .update(updateData)
-        .eq('id', id);
-
-      if (error) throw error;
-
-      // Optimistically update the UI so the animation and buttons respond instantly
-      setAllPotholes(prev => prev.map(p => p.id === id ? { ...p, ...updateData } : p));
+      await updateStatusMutation({
+        potholeId: id as Id<"potholes">,
+        status: newStatus as any,
+        resolvedImageId: resolvedImageId as any,
+        resolvedImageUrl: resolvedImageUrl,
+      });
 
       setResolvingId(null);
       clearSelection();
@@ -126,7 +103,11 @@ export default function MunicipalDashboard({ potholes: propPotholes }: Municipal
         </header>
 
         <div className="grid grid-cols-1 gap-4">
-          {potholes.length === 0 ? (
+          {fetchLoading ? (
+            <div className="flex justify-center p-20">
+              <Loader2 className="w-12 h-12 text-zinc-600 animate-spin" />
+            </div>
+          ) : potholes.length === 0 ? (
             <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl p-20 text-center">
               <MapPin className="w-12 h-12 text-zinc-700 mx-auto mb-4 opacity-20" />
               <p className="text-zinc-500 italic">No potholes reported in the system yet.</p>
@@ -134,7 +115,7 @@ export default function MunicipalDashboard({ potholes: propPotholes }: Municipal
           ) : (
             potholes.map((p, index) => (
               <motion.div
-                key={p.id}
+                key={p._id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
@@ -153,22 +134,22 @@ export default function MunicipalDashboard({ potholes: propPotholes }: Municipal
                         <h3 className="font-bold text-lg text-white mb-1 group-hover:text-blue-400 transition-colors">
                           {p.address || `Pothole at ${p.latitude.toFixed(6)}, ${p.longitude.toFixed(6)}`}
                         </h3>
-                        {p.report_image_url && (
-                          <div className="mt-2 mb-3 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setViewingImage({url: p.report_image_url!, title: 'Report Photo'})}>
+                        {p.reportImageUrl && (
+                          <div className="mt-2 mb-3 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setViewingImage({url: p.reportImageUrl!, title: 'Report Photo'})}>
                             <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1">Report Photo</p>
                             <img 
-                              src={p.report_image_url} 
+                              src={p.reportImageUrl} 
                               alt="Reported Pothole" 
                               className="w-32 h-32 object-cover rounded-xl border border-zinc-800"
                               referrerPolicy="no-referrer"
                             />
                           </div>
                         )}
-                        {p.resolved_image_url && (
-                          <div className="mt-2 mb-3 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setViewingImage({url: p.resolved_image_url!, title: 'Resolution Photo'})}>
+                        {p.resolvedImageUrl && (
+                          <div className="mt-2 mb-3 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setViewingImage({url: p.resolvedImageUrl!, title: 'Resolution Photo'})}>
                             <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest mb-1">Resolution Photo</p>
                             <img 
-                              src={p.resolved_image_url} 
+                              src={p.resolvedImageUrl} 
                               alt="Resolved Pothole" 
                               className="w-32 h-32 object-cover rounded-xl border border-emerald-500/30"
                               referrerPolicy="no-referrer"
@@ -182,7 +163,7 @@ export default function MunicipalDashboard({ potholes: propPotholes }: Municipal
                           </div>
                           <div className="flex items-center gap-1.5 bg-black/40 px-2 py-1 rounded-md border border-zinc-800">
                             <Clock className="w-3 h-3 text-zinc-400" />
-                            <span>{new Date(p.created_at).toLocaleString()}</span>
+                            <span>{new Date(p._creationTime).toLocaleString()}</span>
                           </div>
                         </div>
                       </div>
@@ -195,7 +176,7 @@ export default function MunicipalDashboard({ potholes: propPotholes }: Municipal
                         </div>
                         <div>
                           <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Reported By</p>
-                          <p className="text-sm font-bold text-zinc-200">{p.user_name || 'Anonymous Citizen'}</p>
+                          <p className="text-sm font-bold text-zinc-200">{p.userName || 'Anonymous Citizen'}</p>
                         </div>
                       </div>
                       <div className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest ${
@@ -212,36 +193,36 @@ export default function MunicipalDashboard({ potholes: propPotholes }: Municipal
                     <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mr-2">Update Status:</span>
                     <StatusButton 
                       active={p.status === 'reported'} 
-                      onClick={() => updateStatus(p.id, 'reported')} 
+                      onClick={() => updateStatus(p._id as any, 'reported')} 
                       label="Reported" 
                       color="zinc" 
-                      loading={updatingId === p.id}
+                      loading={updatingId === p._id}
                     />
                     <StatusButton 
                       active={p.status === 'verified'} 
-                      onClick={() => updateStatus(p.id, 'verified')} 
+                      onClick={() => updateStatus(p._id as any, 'verified')} 
                       label="Verified" 
                       color="purple" 
-                      loading={updatingId === p.id}
+                      loading={updatingId === p._id}
                     />
                     <StatusButton 
                       active={p.status === 'fixing'} 
-                      onClick={() => updateStatus(p.id, 'fixing')} 
+                      onClick={() => updateStatus(p._id as any, 'fixing')} 
                       label="Fixing" 
                       color="blue" 
-                      loading={updatingId === p.id}
+                      loading={updatingId === p._id}
                     />
                     <StatusButton 
                       active={p.status === 'resolved'} 
-                      onClick={() => updateStatus(p.id, 'resolved')} 
+                      onClick={() => updateStatus(p._id as any, 'resolved')} 
                       label="Resolved" 
                       color="emerald" 
-                      loading={updatingId === p.id}
+                      loading={updatingId === p._id}
                     />
                   </div>
 
                   <AnimatePresence>
-                    {resolvingId === p.id && (
+                    {resolvingId === p._id && (
                       <motion.div
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
@@ -287,11 +268,11 @@ export default function MunicipalDashboard({ potholes: propPotholes }: Municipal
                           </div>
 
                           <button
-                            disabled={!selectedFile || updatingId === p.id}
-                            onClick={() => updateStatus(p.id, 'resolved')}
+                            disabled={!selectedFile || updatingId === p._id}
+                            onClick={() => updateStatus(p._id as any, 'resolved')}
                             className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 disabled:text-zinc-500 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2"
                           >
-                            {updatingId === p.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                            {updatingId === p._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                             Confirm Resolution
                           </button>
                         </div>

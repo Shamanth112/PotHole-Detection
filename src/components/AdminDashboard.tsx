@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../supabase';
-import { auth } from '../firebase';
+import { useQuery, useMutation } from 'convex/react';
+import { useAuthActions } from '@convex-dev/auth/react';
+import { api } from '../../convex/_generated/api';
 import { 
   UserPlus, Users, ShieldCheck, Mail, Trash2, Loader2, 
   MapPin, Plus, AlertTriangle, CheckCircle2, Clock, 
@@ -8,20 +9,33 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ImageViewer from './ImageViewer';
+import { Id } from '../../convex/_generated/dataModel';
 
 type AdminTab = 'stats' | 'users' | 'potholes' | 'permitted';
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<AdminTab>('stats');
-  const [users, setUsers] = useState<any[]>([]);
-  const [potholes, setPotholes] = useState<any[]>([]);
-  const [permittedUsers, setPermittedUsers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [fetchError, setFetchError] = useState<string | null>(null);
-  const [usersLoading, setUsersLoading] = useState(false);
+
+  // Queries
+  const users = useQuery(api.users.listAll) ?? [];
+  const potholes = useQuery(api.potholes.listAll) ?? [];
+  const permittedUsers = useQuery(api.permittedUsers.list) ?? [];
+  const loading = useQuery(api.users.listAll) === undefined;
+
+  // Mutations
+  const addPermittedUserMutation = useMutation(api.permittedUsers.upsert);
+  const deletePermittedUserMutation = useMutation(api.permittedUsers.remove);
+  const updatePermittedRoleMutation = useMutation(api.permittedUsers.updateRole);
+  
+  const deleteUserMutation = useMutation(api.users.deleteUser);
+  const updateUserRoleMutation = useMutation(api.users.updateRole);
+  
+  const addPotholeMutation = useMutation(api.potholes.addManual);
+  const deletePotholeMutation = useMutation(api.potholes.deletePothole);
+  const editPotholeMutation = useMutation(api.potholes.updatePothole);
 
   // Editing states
   const [editingPotholeId, setEditingPotholeId] = useState<string | null>(null);
@@ -36,6 +50,7 @@ export default function AdminDashboard() {
   // Permitted User Form State
   const [newEmail, setNewEmail] = useState('');
   const [newRole, setNewRole] = useState<'citizen' | 'admin' | 'municipal'>('citizen');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Pothole Form State
   const [showAddPothole, setShowAddPothole] = useState(false);
@@ -46,116 +61,29 @@ export default function AdminDashboard() {
     address: ''
   });
 
-  useEffect(() => {
-    fetchUsers();
-    fetchPotholes();
-    fetchPermittedUsers();
-
-    const potholesChannel = supabase
-      .channel('admin-potholes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'potholes' }, () => {
-        fetchPotholes();
-      })
-      .subscribe();
-
-    const permittedChannel = supabase
-      .channel('admin-permitted')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'permitted_users' }, () => {
-        fetchPermittedUsers();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(potholesChannel);
-      supabase.removeChannel(permittedChannel);
-    };
-  }, []);
-
-  const fetchPotholes = async () => {
-    const { data, error } = await supabase
-      .from('potholes')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(100);
-    if (error) {
-      console.error("Fetch potholes error:", error);
-      alert("Error fetching potholes: " + error.message);
-    } else if (data) {
-      setPotholes(data);
-    }
-  };
-
-  const fetchPermittedUsers = async () => {
-    const { data, error } = await supabase
-      .from('permitted_users')
-      .select('*');
-    if (!error && data) setPermittedUsers(data);
-  };
-
-  const fetchUsers = async () => {
-    setUsersLoading(true);
-    setFetchError(null);
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .order('email', { ascending: true });
-      
-      if (error) {
-        console.error("Error fetching users:", error);
-        setFetchError(`RLS Error: ${error.message} (code: ${error.code}). Run the SQL fix in Supabase Dashboard.`);
-        setUsers([]);
-      } else {
-        setUsers(data || []);
-        if ((data || []).length === 0) {
-          setFetchError('No users returned. The Supabase admin RLS policy may not be applied yet. Please run the SQL fix in your Supabase Dashboard → SQL Editor.');
-        }
-      }
-    } catch (err: any) {
-      console.error("Error fetching users:", err);
-      setFetchError(`Unexpected error: ${err.message}`);
-    } finally {
-      setUsersLoading(false);
-    }
-  };
-
   // --- Permitted Users CRUD ---
   const handleAddPermittedUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setIsSubmitting(true);
     setError('');
     setSuccess('');
 
     try {
       const emailKey = newEmail.toLowerCase().trim();
-      const { error } = await supabase
-        .from('permitted_users')
-        .upsert({
-          email: emailKey,
-          role: newRole,
-          created_at: new Date().toISOString()
-        });
-
-      if (error) throw error;
-
+      await addPermittedUserMutation({ email: emailKey, role: newRole });
       setNewEmail('');
       setSuccess(`Successfully added ${emailKey} as ${newRole}.`);
     } catch (err: any) {
       setError(err.message);
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
   const handleDeletePermittedUser = async (email: string) => {
     if (!window.confirm(`Remove permissions for ${email}?`)) return;
     try {
-      const { error } = await supabase
-        .from('permitted_users')
-        .delete()
-        .eq('email', email);
-      
-      if (error) throw error;
+      await deletePermittedUserMutation({ email });
       setSuccess(`Permissions removed for ${email}.`);
     } catch (err: any) {
       setError(`Failed to remove permissions: ${err.message}`);
@@ -164,15 +92,9 @@ export default function AdminDashboard() {
 
   const handleEditPermittedUser = async (email: string) => {
     try {
-      const { error } = await supabase
-        .from('permitted_users')
-        .update({ role: editPermittedRole })
-        .eq('email', email);
-
-      if (error) throw error;
+      await updatePermittedRoleMutation({ email, role: editPermittedRole as any });
       setEditingPermittedEmail(null);
       setSuccess(`Role updated for ${email}.`);
-      fetchPermittedUsers();
     } catch (err: any) {
       setError(`Failed to update role: ${err.message}`);
     }
@@ -181,16 +103,10 @@ export default function AdminDashboard() {
   // --- Users CRUD ---
   const handleDeleteUser = async (user: any) => {
     if (!window.confirm(`Are you sure you want to delete ${user.email} from registered users?`)) return;
-    setDeletingId(user.id);
+    setDeletingId(user._id);
     try {
-      const { error } = await supabase
-        .from('users')
-        .delete()
-        .eq('id', user.id);
-      
-      if (error) throw error;
+      await deleteUserMutation({ userId: user._id });
       setSuccess(`User ${user.email} deleted.`);
-      fetchUsers();
     } catch (err: any) {
       setError(`Failed to delete user: ${err.message}`);
     } finally {
@@ -198,17 +114,11 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleEditUserRole = async (userId: string) => {
+  const handleEditUserRole = async (userId: Id<"users">) => {
     try {
-      const { error } = await supabase
-        .from('users')
-        .update({ role: editUserRole })
-        .eq('id', userId);
-
-      if (error) throw error;
+      await updateUserRoleMutation({ userId, role: editUserRole as any });
       setEditingUserId(null);
       setSuccess(`User role updated to ${editUserRole}.`);
-      fetchUsers();
     } catch (err: any) {
       setError(`Failed to update user role: ${err.message}`);
     }
@@ -217,66 +127,44 @@ export default function AdminDashboard() {
   // --- Potholes CRUD ---
   const handleAddPothole = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setIsSubmitting(true);
     try {
-      const firebaseUser = auth.currentUser;
-      const { error } = await supabase
-        .from('potholes')
-        .insert({
-          latitude: parseFloat(newPothole.latitude),
-          longitude: parseFloat(newPothole.longitude),
-          severity: newPothole.severity,
-          address: newPothole.address || 'Manual Entry',
-          status: 'reported',
-          created_at: new Date().toISOString(),
-          user_id: firebaseUser?.uid || null,
-          user_name: 'Admin Manual Entry'
-        });
-
-      if (error) throw error;
-
+      await addPotholeMutation({
+        latitude: parseFloat(newPothole.latitude),
+        longitude: parseFloat(newPothole.longitude),
+        severity: newPothole.severity,
+        address: newPothole.address || 'Manual Entry',
+      });
       setShowAddPothole(false);
       setNewPothole({ latitude: '', longitude: '', severity: 'medium', address: '' });
       setSuccess('Pothole manually added to system.');
     } catch (err: any) {
       setError(err.message);
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
-  const handleDeletePothole = async (id: string) => {
+  const handleDeletePothole = async (id: Id<"potholes">) => {
     if (!window.confirm('Delete this pothole report permanently?')) return;
     try {
-      const { error } = await supabase
-        .from('potholes')
-        .delete()
-        .eq('id', id);
-      
-      if (error) throw error;
+      await deletePotholeMutation({ potholeId: id });
       setSuccess('Pothole report removed.');
-      fetchPotholes();
     } catch (err: any) {
       setError(err.message);
     }
   };
 
-  const handleEditPothole = async (id: string) => {
+  const handleEditPothole = async (id: Id<"potholes">) => {
     try {
-      const { error } = await supabase
-        .from('potholes')
-        .update({
-          status: editPotholeData.status,
-          severity: editPotholeData.severity,
-          address: editPotholeData.address,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id);
-
-      if (error) throw error;
+      await editPotholeMutation({
+        potholeId: id,
+        status: editPotholeData.status,
+        severity: editPotholeData.severity,
+        address: editPotholeData.address,
+      });
       setEditingPotholeId(null);
       setSuccess('Pothole updated successfully.');
-      fetchPotholes();
     } catch (err: any) {
       setError(`Failed to update pothole: ${err.message}`);
     }
@@ -428,10 +316,10 @@ export default function AdminDashboard() {
                 </div>
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={isSubmitting}
                   className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-2xl transition-all disabled:opacity-50 flex items-center justify-center gap-2 uppercase tracking-widest text-xs"
                 >
-                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Authorize Email'}
+                  {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Authorize Email'}
                 </button>
               </form>
             </div>
@@ -511,27 +399,14 @@ export default function AdminDashboard() {
               <Users className="w-5 h-5 text-emerald-500" />
               Registered User Directory
               <span className="ml-auto text-xs font-black text-zinc-600 normal-case tracking-normal not-italic">{users.length} users</span>
-              <button
-                onClick={fetchUsers}
-                disabled={usersLoading}
-                className="ml-2 flex items-center gap-1 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50"
-              >
-                {usersLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : '↻'} Refresh
-              </button>
             </h3>
-            {fetchError && (
-              <div className="mb-4 p-4 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-2xl text-xs font-bold">
-                <p className="font-black uppercase tracking-widest mb-1">⚠ Diagnostic Info</p>
-                <p>{fetchError}</p>
-              </div>
-            )}
             <div className="grid grid-cols-1 gap-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
-              {usersLoading && (
+              {loading && (
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="w-8 h-8 text-zinc-600 animate-spin" />
                 </div>
               )}
-              {!usersLoading && users.length === 0 && !fetchError && (
+              {!loading && users.length === 0 && (
                 <p className="text-center text-zinc-600 text-xs italic py-8">No registered users found.</p>
               )}
               {users.map((u, i) => (
@@ -539,15 +414,15 @@ export default function AdminDashboard() {
                   <div className="flex items-start gap-4">
                     {/* Avatar */}
                     <img
-                      src={u.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.full_name || u.email || 'U')}&background=1a365d&color=fff`}
-                      alt={u.full_name || u.email}
+                      src={u.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || u.email || 'U')}&background=1a365d&color=fff`}
+                      alt={u.name || u.email}
                       className="w-12 h-12 rounded-2xl border border-zinc-700 object-cover shrink-0"
                     />
 
                     {/* Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-bold text-white truncate">{u.full_name || 'No Name'}</p>
+                        <p className="text-sm font-bold text-white truncate">{u.name || 'No Name'}</p>
                         <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded ${
                           u.role === 'admin' ? 'bg-purple-500/20 text-purple-500 border border-purple-500/30' : 
                           u.role === 'municipal' ? 'bg-emerald-500/20 text-emerald-500 border border-emerald-500/30' : 
@@ -557,17 +432,17 @@ export default function AdminDashboard() {
                         </span>
                       </div>
                       <p className="text-xs text-zinc-400 mt-0.5 truncate">{u.email}</p>
-                      <p className="text-[10px] text-zinc-600 font-mono mt-1 truncate" title={u.id}>UID: {u.id}</p>
-                      {u.created_at && (
+                      <p className="text-[10px] text-zinc-600 font-mono mt-1 truncate" title={u._id}>ID: {u._id}</p>
+                      {u._creationTime && (
                         <p className="text-[10px] text-zinc-600 mt-0.5">
-                          Joined: {new Date(u.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                          Joined: {new Date(u._creationTime).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
                         </p>
                       )}
                     </div>
 
                     {/* Actions */}
                     <div className="flex items-center gap-1 shrink-0">
-                      {editingUserId === u.id ? (
+                      {editingUserId === u._id ? (
                         <div className="flex items-center gap-2">
                           <select
                             value={editUserRole}
@@ -578,7 +453,7 @@ export default function AdminDashboard() {
                             <option value="municipal">Municipal</option>
                             <option value="admin">Admin</option>
                           </select>
-                          <button onClick={() => handleEditUserRole(u.id)} className="p-1 text-emerald-500 hover:text-emerald-400">
+                          <button onClick={() => handleEditUserRole(u._id)} className="p-1 text-emerald-500 hover:text-emerald-400">
                             <Save className="w-4 h-4" />
                           </button>
                           <button onClick={() => setEditingUserId(null)} className="p-1 text-zinc-500 hover:text-white">
@@ -588,7 +463,7 @@ export default function AdminDashboard() {
                       ) : (
                         <>
                           <button 
-                            onClick={() => { setEditingUserId(u.id); setEditUserRole(u.role || 'citizen'); }}
+                            onClick={() => { setEditingUserId(u._id); setEditUserRole(u.role || 'citizen'); }}
                             className="p-2 text-zinc-700 hover:text-blue-500 transition-colors"
                             title="Edit role"
                           >
@@ -596,11 +471,11 @@ export default function AdminDashboard() {
                           </button>
                           <button 
                             onClick={() => handleDeleteUser(u)}
-                            disabled={deletingId === u.id || u.role === 'admin'}
+                            disabled={deletingId === u._id || u.role === 'admin'}
                             className="p-2 text-zinc-700 hover:text-red-500 transition-colors disabled:opacity-30"
                             title="Delete user"
                           >
-                            {deletingId === u.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                            {deletingId === u._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                           </button>
                         </>
                       )}
@@ -642,8 +517,8 @@ export default function AdminDashboard() {
                 </div>
               ) : (
                 potholes.map((p) => (
-                  <div key={p.id} className="bg-zinc-900 p-4 rounded-2xl border border-zinc-800 group hover:border-zinc-700 transition-all">
-                    {editingPotholeId === p.id ? (
+                  <div key={p._id} className="bg-zinc-900 p-4 rounded-2xl border border-zinc-800 group hover:border-zinc-700 transition-all">
+                    {editingPotholeId === p._id ? (
                       /* ---- EDIT MODE ---- */
                       <div className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -692,7 +567,7 @@ export default function AdminDashboard() {
                             Cancel
                           </button>
                           <button 
-                            onClick={() => handleEditPothole(p.id)} 
+                            onClick={() => handleEditPothole(p._id as any)} 
                             className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-emerald-500 transition-all"
                           >
                             <Save className="w-3 h-3" /> Save Changes
@@ -713,21 +588,22 @@ export default function AdminDashboard() {
                             <h4 className="text-sm font-bold text-white truncate">{p.address || 'Unknown Location'}</h4>
                             
                             <div className="flex gap-2 mt-2 mb-2 overflow-x-auto pb-1">
-                              {p.report_image_url && (
-                                <div className="shrink-0 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setViewingImage({url: p.report_image_url, title: 'Report Photo'})}>
-                                  <img src={p.report_image_url} className="w-16 h-16 object-cover rounded-xl border border-zinc-700" alt="Report" referrerPolicy="no-referrer" />
+                              {/* TODO url mapping */}
+                              {p.reportImageUrl && (
+                                <div className="shrink-0 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setViewingImage({url: p.reportImageUrl!, title: 'Report Photo'})}>
+                                  <img src={p.reportImageUrl} className="w-16 h-16 object-cover rounded-xl border border-zinc-700" alt="Report" referrerPolicy="no-referrer" />
                                 </div>
                               )}
-                              {p.resolved_image_url && (
-                                <div className="shrink-0 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setViewingImage({url: p.resolved_image_url, title: 'Resolved Photo'})}>
-                                  <img src={p.resolved_image_url} className="w-16 h-16 object-cover rounded-xl border border-emerald-500/30" alt="Resolved" referrerPolicy="no-referrer" />
+                              {p.resolvedImageUrl && (
+                                <div className="shrink-0 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setViewingImage({url: p.resolvedImageUrl!, title: 'Resolved Photo'})}>
+                                  <img src={p.resolvedImageUrl} className="w-16 h-16 object-cover rounded-xl border border-emerald-500/30" alt="Resolved" referrerPolicy="no-referrer" />
                                 </div>
                               )}
                             </div>
 
                             <div className="flex items-center gap-3 mt-1 text-[10px] font-bold text-zinc-500 flex-wrap">
                               <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {p.latitude?.toFixed(4)}, {p.longitude?.toFixed(4)}</span>
-                              <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {new Date(p.created_at).toLocaleString()}</span>
+                              <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {new Date(p._creationTime).toLocaleString()}</span>
                               <span className={`px-2 py-0.5 rounded uppercase ${
                                 p.status === 'resolved' ? 'bg-emerald-500/20 text-emerald-500' : 
                                 p.status === 'in-progress' ? 'bg-blue-500/20 text-blue-500' : 
@@ -746,13 +622,13 @@ export default function AdminDashboard() {
                         </div>
                         <div className="flex items-center gap-1">
                           <button 
-                            onClick={() => { setEditingPotholeId(p.id); setEditPotholeData({ status: p.status, severity: p.severity, address: p.address || '' }); }}
+                            onClick={() => { setEditingPotholeId(p._id); setEditPotholeData({ status: p.status, severity: p.severity, address: p.address || '' }); }}
                             className="p-3 text-zinc-700 hover:text-blue-500 transition-colors"
                           >
                             <Pencil className="w-5 h-5" />
                           </button>
                           <button 
-                            onClick={() => handleDeletePothole(p.id)}
+                            onClick={() => handleDeletePothole(p._id as any)}
                             className="p-3 text-zinc-700 hover:text-red-500 transition-colors"
                           >
                             <Trash2 className="w-5 h-5" />
@@ -813,6 +689,7 @@ export default function AdminDashboard() {
                     />
                   </div>
                 </div>
+                
                 <div>
                   <label className="block text-[10px] font-black text-zinc-500 uppercase mb-2 tracking-widest">Severity</label>
                   <select
@@ -820,35 +697,37 @@ export default function AdminDashboard() {
                     onChange={(e) => setNewPothole({...newPothole, severity: e.target.value as any})}
                     className="w-full bg-black border border-zinc-800 rounded-2xl py-3 px-4 text-white outline-none focus:ring-2 focus:ring-red-500"
                   >
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
+                    <option value="low">Low Risk</option>
+                    <option value="medium">Medium Risk</option>
+                    <option value="high">High Risk</option>
                   </select>
                 </div>
+
                 <div>
-                  <label className="block text-[10px] font-black text-zinc-500 uppercase mb-2 tracking-widest">Address / Description</label>
+                  <label className="block text-[10px] font-black text-zinc-500 uppercase mb-2 tracking-widest">Address / Desc</label>
                   <input
                     type="text"
                     value={newPothole.address}
                     onChange={(e) => setNewPothole({...newPothole, address: e.target.value})}
                     className="w-full bg-black border border-zinc-800 rounded-2xl py-3 px-4 text-white outline-none focus:ring-2 focus:ring-red-500"
-                    placeholder="e.g. MG Road, Near Metro Station"
+                    placeholder="e.g. Main Street, near post office"
                   />
                 </div>
-                <div className="flex gap-4 pt-4">
+
+                <div className="flex items-center gap-4 pt-4 mt-8 border-t border-zinc-800">
                   <button
                     type="button"
                     onClick={() => setShowAddPothole(false)}
-                    className="flex-1 py-4 bg-zinc-800 text-white font-black rounded-2xl uppercase tracking-widest text-xs"
+                    className="flex-1 py-4 text-zinc-400 font-black text-xs uppercase tracking-widest hover:text-white transition-all"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    disabled={loading}
-                    className="flex-1 py-4 bg-red-600 text-white font-black rounded-2xl uppercase tracking-widest text-xs shadow-lg shadow-red-600/20"
+                    disabled={isSubmitting}
+                    className="flex-[2] bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2"
                   >
-                    {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Register Pothole'}
+                    {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Plus className="w-4 h-4" /> Add Report</>}
                   </button>
                 </div>
               </form>
@@ -856,6 +735,12 @@ export default function AdminDashboard() {
           </div>
         )}
       </AnimatePresence>
+
+      <ImageViewer 
+        url={viewingImage?.url || null} 
+        title={viewingImage?.title} 
+        onClose={() => setViewingImage(null)} 
+      />
     </div>
   );
 }

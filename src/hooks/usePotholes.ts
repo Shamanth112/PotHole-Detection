@@ -1,101 +1,30 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '../supabase';
-import { auth } from '../firebase';
-import { onAuthStateChanged } from 'firebase/auth';
+import { useQuery } from 'convex/react';
+import { api } from '../../convex/_generated/api';
 
 export interface Pothole {
-  id: string;
+  _id: string;
+  userId?: string;
+  userName?: string;
   latitude: number;
   longitude: number;
-  created_at: string;
-  timestamp?: string; // legacy support
+  address?: string;
   severity: 'low' | 'medium' | 'high';
   status: 'reported' | 'verified' | 'fixing' | 'in-progress' | 'resolved' | 'dismissed';
-  report_image_url?: string;
-  resolved_image_url?: string;
-  user_id: string;
-  user_name?: string;
-  address?: string;
+  reportImageId?: string;
+  resolvedImageId?: string;
+  reportImageUrl?: string;
+  resolvedImageUrl?: string;
+  _creationTime: number;
 }
 
+/**
+ * Returns potholes reactive via Convex useQuery.
+ * - Citizens see only their own (enforced server-side).
+ * - Admin/Municipal see all.
+ * Automatically re-renders whenever the data changes — no subscriptions needed.
+ */
 export function usePotholes() {
-  const [potholes, setPotholes] = useState<Pothole[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [userState, setUserState] = useState<{ uid: string | null; role: string | null }>({
-    uid: null,
-    role: null
-  });
-
-  // Listen to Firebase auth state
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        const { data: profile } = await supabase
-          .from('users')
-          .select('role')
-          .eq('id', firebaseUser.uid)
-          .single();
-        setUserState({ uid: firebaseUser.uid, role: profile?.role || 'citizen' });
-      } else {
-        setUserState({ uid: null, role: null });
-        setPotholes([]);
-        setLoading(false);
-      }
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    if (!userState.uid) {
-      setLoading(false);
-      return;
-    }
-
-    const fetchPotholes = async () => {
-      let query = supabase
-        .from('potholes')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      if (userState.role !== 'admin' && userState.role !== 'municipal') {
-        query = query.eq('user_id', userState.uid);
-      }
-
-      const { data, error } = await query;
-      if (error) {
-        console.error("Error fetching potholes:", error);
-      } else {
-        setPotholes(data || []);
-      }
-      setLoading(false);
-    };
-
-    fetchPotholes();
-
-    const channel = supabase
-      .channel('potholes-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'potholes',
-          filter: userState.role !== 'admin' && userState.role !== 'municipal'
-            ? `user_id=eq.${userState.uid}`
-            : undefined
-        },
-        () => {
-          fetchPotholes();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [userState]);
-
+  const potholes = useQuery(api.potholes.list) ?? [];
+  const loading = potholes === undefined;
   return { potholes, loading };
 }

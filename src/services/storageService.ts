@@ -1,46 +1,30 @@
-import { supabase } from '../supabase';
+import { useConvex } from 'convex/react';
+import { api } from '../convex/_generated/api';
 
-const BUCKET_NAME = import.meta.env.VITE_SUPABASE_BUCKET || 'pothole-images';
+/**
+ * Upload a File or Blob to Convex file storage.
+ * Returns the storage ID (not a URL). Use api.storage.getImageUrl to resolve.
+ */
+export async function uploadToConvex(
+  convex: ReturnType<typeof useConvex>,
+  file: File | Blob,
+  contentType = 'image/jpeg'
+): Promise<string> {
+  // 1. Get a short-lived upload URL from Convex
+  const uploadUrl = await convex.mutation(api.storage.generateUploadUrl, {});
 
-export async function uploadPotholeImage(file: File, path: string): Promise<string> {
-  try {
-    const { data, error } = await supabase.storage
-      .from(BUCKET_NAME)
-      .upload(path, file, {
-        upsert: true,
-      });
+  // 2. PUT the file to that URL
+  const res = await fetch(uploadUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': contentType },
+    body: file,
+  });
 
-    if (error) throw error;
-
-    const { data: publicUrlData } = supabase.storage
-      .from(BUCKET_NAME)
-      .getPublicUrl(path);
-
-    return publicUrlData.publicUrl;
-  } catch (error) {
-    console.error('Supabase Storage upload error:', error);
-    throw error;
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Upload failed: ${res.status} ${text}`);
   }
-}
 
-export async function uploadPotholeImageFromBlob(blob: Blob, path: string): Promise<string> {
-  try {
-    const { data, error } = await supabase.storage
-      .from(BUCKET_NAME)
-      .upload(path, blob, {
-        contentType: 'image/jpeg',
-        upsert: true,
-      });
-
-    if (error) throw error;
-
-    const { data: publicUrlData } = supabase.storage
-      .from(BUCKET_NAME)
-      .getPublicUrl(path);
-
-    return publicUrlData.publicUrl;
-  } catch (error) {
-    console.error('Supabase Storage blob upload error:', error);
-    throw error;
-  }
+  const { storageId } = await res.json();
+  return storageId as string;
 }

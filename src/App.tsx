@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { supabase, setSupabaseToken } from './supabase';
-import { auth } from './firebase';
-import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
+import { useAuthActions } from '@convex-dev/auth/react';
+import { useQuery, useMutation, useConvex } from 'convex/react';
+import { api } from '../convex/_generated/api';
 import HomeView from './components/HomeView';
 import ReportView from './components/ReportView';
 import CameraView from './components/CameraView';
@@ -11,6 +11,7 @@ import PotholeList from './components/PotholeList';
 import MunicipalDashboard from './components/MunicipalDashboard';
 import AdminDashboard from './components/AdminDashboard';
 import { usePotholes } from './hooks/usePotholes';
+import { uploadToConvex } from './services/storageService';
 import { 
   LayoutDashboard, 
   Map as MapIcon, 
@@ -28,23 +29,31 @@ import {
   ChevronRight,
   Bell,
   Award,
-  Shield
+  Shield,
+  Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import confetti from 'canvas-confetti';
-import { uploadPotholeImage } from './services/storageService';
+import { Id } from '../convex/_generated/dataModel';
 
 type Tab = 'home' | 'map' | 'history' | 'scan' | 'profile' | 'report';
 
 export default function App() {
-  const [user, setUser] = useState<any | null>(null);
-  const [userRole, setUserRole] = useState<'citizen' | 'admin' | 'municipal' | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { signIn, signOut } = useAuthActions();
+  
+  // Gets current user from Convex if authenticated
+  const user = useQuery(api.users.getSelf);
+  // Returns undefined while loading, null if unauthenticated, object if authenticated
+  const loading = user === undefined;
+
+  const updateAvatarBase = useMutation(api.users.updateAvatar);
+  const reportPotholeBase = useMutation(api.potholes.report);
+  const convex = useConvex();
+
   const [activeTab, setActiveTab] = useState<Tab>('home');
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const { potholes } = usePotholes();
   const navigate = useNavigate();
-  const location = useLocation();
 
   useEffect(() => {
     // Request GPS permission
@@ -70,78 +79,9 @@ export default function App() {
     }
   }, []);
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        try {
-          const token = await firebaseUser.getIdToken();
-          setSupabaseToken(token);
-          await syncUserProfile(firebaseUser);
-        } catch (error) {
-          console.error("Auth init error:", error);
-          setSupabaseToken(null);
-          setUser(null);
-          setUserRole(null);
-        }
-      } else {
-        setSupabaseToken(null);
-        setUser(null);
-        setUserRole(null);
-      }
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  const syncUserProfile = async (authUser: any) => {
-    try {
-      let role: 'citizen' | 'admin' | 'municipal' = 'citizen';
-      const email = authUser.email?.toLowerCase().trim() || '';
-      const isDefaultAdmin = email === "shamanth.p2007@gmail.com";
-
-      // Check permitted_users table
-      const { data: permittedUser } = await supabase
-        .from('permitted_users')
-        .select('role')
-        .eq('email', email)
-        .single();
-
-      if (permittedUser) {
-        role = permittedUser.role;
-      } else if (isDefaultAdmin) {
-        role = 'admin';
-      }
-
-      // Upsert user profile
-      const { error: upsertError } = await supabase
-        .from('users')
-        .upsert({
-          id: authUser.uid,
-          full_name: authUser.displayName || authUser.email?.split('@')[0],
-          email: authUser.email,
-          avatar_url: authUser.photoURL,
-          role: role
-        });
-
-      if (upsertError) console.error("Profile sync error:", upsertError);
-
-      setUser({
-        uid: authUser.uid,
-        email: authUser.email,
-        displayName: authUser.displayName,
-        photoURL: authUser.photoURL
-      });
-      setUserRole(role);
-    } catch (error) {
-      console.error("Error syncing user profile:", error);
-    }
-  };
-
   const handleLogin = async () => {
     try {
-      const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
+      await signIn("google"); // Routes to /api/auth/signin/google
     } catch (error: any) {
       console.error("Login failed:", error);
       alert("Login failed: " + error.message);
@@ -149,8 +89,7 @@ export default function App() {
   };
 
   const handleLogout = async () => {
-    await signOut(auth);
-    setSupabaseToken(null);
+    await signOut();
     navigate('/');
   };
 
@@ -159,42 +98,31 @@ export default function App() {
     if (!file || !user) return;
 
     try {
-      const photoURL = await uploadPotholeImage(file, `profiles/${user.uid}_${Date.now()}.jpg`);
+      const storageId = await uploadToConvex(convex, file);
+      const url = await convex.query(api.storage.getImageUrl, { storageId: storageId as Id<"_storage"> });
       
-      // Update Supabase users table
-      const { error } = await supabase
-        .from('users')
-        .update({ avatar_url: photoURL })
-        .eq('id', user.uid);
-      
-      if (error) throw error;
-      
-      setUser((prev: any) => prev ? { ...prev, photoURL } : null);
-      alert("Profile photo updated successfully!");
+      if (url) {
+        await updateAvatarBase({ avatarUrl: url });
+        alert("Profile photo updated successfully!");
+      }
     } catch (error) {
       console.error("Error uploading profile photo:", error);
       alert("Failed to upload profile photo.");
     }
   };
 
-  const handleReportPothole = async (data: { latitude: number; longitude: number; severity: string; address?: string; reportImageUrl?: string }, isAuto = false) => {
+  const handleReportPothole = async (data: { latitude: number; longitude: number; severity: string; address?: string; reportImageUrl?: string; reportImageId?: string }, isAuto = false) => {
     if (!user) return;
     try {
-      const { error } = await supabase
-        .from('potholes')
-        .insert({
-          latitude: data.latitude,
-          longitude: data.longitude,
-          severity: data.severity,
-          address: data.address,
-          report_image_url: data.reportImageUrl,
-          user_id: user.uid,
-          user_name: user.displayName || 'Road Guardian',
-          status: 'reported',
-          created_at: new Date().toISOString()
-        });
-
-      if (error) throw error;
+      await reportPotholeBase({
+        latitude: data.latitude,
+        longitude: data.longitude,
+        severity: data.severity as any,
+        address: data.address,
+        reportImageUrl: data.reportImageUrl,
+        reportImageId: data.reportImageId as any,
+        userName: user.name ?? 'Road Guardian',
+      });
       
       if (!isAuto) {
         setActiveTab('history');
@@ -223,19 +151,19 @@ export default function App() {
       longitude: userLocation.lng,
       severity: detection.score > 0.8 ? 'high' : 'medium',
       address: 'AI Detected - Road Focus Active',
-      reportImageUrl: imageUrl
+      reportImageUrl: imageUrl // we just store the generic url from the detector logic
     }, true);
   };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-black">
-        <div className="w-16 h-16 border-4 border-red-500/20 border-t-red-500 rounded-full animate-spin" />
+        <div className="w-16 h-16 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
       </div>
     );
   }
 
-  if (user && userRole === 'municipal') {
+  if (user && user.role === 'municipal') {
     return (
       <div className="min-h-screen bg-black">
         <header className="h-16 border-b border-zinc-800 bg-black/50 backdrop-blur-xl flex items-center justify-between px-6 sticky top-0 z-50">
@@ -243,15 +171,15 @@ export default function App() {
             <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-blue-600">
               <ShieldAlert className="w-5 h-5 text-white" />
             </div>
-            <span className="font-black text-xl tracking-tighter uppercase italic">
-              Pothole<span className="text-blue-600">Detection</span> IDP
+            <span className="font-black text-xl tracking-tighter uppercase italic text-white">
+              Road<span className="text-blue-600">Guard</span>
             </span>
           </div>
           <div className="flex items-center gap-4">
             <button onClick={handleLogout} className="p-2 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-white">
               <LogOut className="w-5 h-5" />
             </button>
-            <img src={user.photoURL || `https://ui-avatars.com/api/?name=${user.email}`} className="w-8 h-8 rounded-full border border-zinc-700" alt="User" />
+            <img src={user.avatarUrl || `https://ui-avatars.com/api/?name=${user.email}`} className="w-8 h-8 rounded-full border border-zinc-700 object-cover" alt="User" />
           </div>
         </header>
         <MunicipalDashboard potholes={potholes} />
@@ -262,14 +190,14 @@ export default function App() {
   return (
     <Routes>
       <Route path="/admin" element={
-        user && userRole === 'admin' ? (
+        user && user.role === 'admin' ? (
           <div className="min-h-screen bg-black text-white">
             <header className="h-16 border-b border-zinc-800 bg-black/50 backdrop-blur-xl flex items-center justify-between px-6 sticky top-0 z-50">
               <div className="flex items-center gap-3">
                 <ShieldCheck className="w-6 h-6 text-emerald-500" />
                 <span className="font-black text-xl tracking-tighter uppercase italic">Admin Console</span>
               </div>
-              <button onClick={() => navigate('/')} className="text-zinc-400 hover:text-white flex items-center gap-2 text-sm">
+              <button onClick={() => navigate('/')} className="text-zinc-400 hover:text-white flex items-center gap-2 text-sm font-bold">
                 <ArrowLeft className="w-4 h-4" /> Back to App
               </button>
             </header>
@@ -355,7 +283,7 @@ export default function App() {
                   icon={<UserIcon className="w-5 h-5" />} 
                   label="My Profile" 
                 />
-                {userRole === 'admin' && (
+                {user.role === 'admin' && (
                   <SidebarButton 
                     active={false} 
                     onClick={() => navigate('/admin')} 
@@ -368,12 +296,12 @@ export default function App() {
               <div className="mt-auto pt-6 border-t border-white/10">
                 <div className="flex items-center gap-3 mb-6">
                   <img 
-                    src={user.photoURL || `https://ui-avatars.com/api/?name=${user.email}`} 
-                    className="w-10 h-10 rounded-xl border border-white/20"
+                    src={user.avatarUrl || `https://ui-avatars.com/api/?name=${user.email}`} 
+                    className="w-10 h-10 rounded-xl border border-white/20 object-cover"
                     alt="User"
                   />
                   <div className="min-w-0">
-                    <p className="font-bold text-sm truncate">{user.displayName || 'Guardian'}</p>
+                    <p className="font-bold text-sm truncate">{user.name || 'Guardian'}</p>
                     <p className="text-[10px] text-blue-200/50 truncate">{user.email}</p>
                   </div>
                 </div>
@@ -400,13 +328,13 @@ export default function App() {
                     className="h-full"
                   >
                     <HomeView 
-                      userRole={userRole}
+                      userRole={user.role as any}
                       onStartDetection={() => setActiveTab('scan')}
                       onReportManually={() => setActiveTab('report')}
                       stats={{
                         detectedToday: potholes.filter(p => {
                           const today = new Date();
-                          const pDate = new Date(p.created_at);
+                          const pDate = new Date(p._creationTime);
                           return pDate.toDateString() === today.toDateString();
                         }).length,
                         fixedThisWeek: potholes.filter(p => p.status === 'resolved').length
@@ -467,7 +395,7 @@ export default function App() {
                     <ReportView 
                       onBack={() => setActiveTab('home')} 
                       onSubmit={(data) => handleReportPothole(data)} 
-                      userId={user.uid}
+                      userId={user._id as string}
                     />
                   </motion.div>
                 )}
@@ -493,7 +421,7 @@ export default function App() {
                         <div className="relative group">
                           <div className="w-20 h-20 rounded-3xl border-4 border-white/20 overflow-hidden shadow-2xl">
                             <img 
-                              src={user.photoURL || `https://ui-avatars.com/api/?name=${user.email}`} 
+                              src={user.avatarUrl || `https://ui-avatars.com/api/?name=${user.email}`} 
                               className="w-full h-full object-cover"
                               alt="Profile"
                             />
@@ -504,7 +432,7 @@ export default function App() {
                           </label>
                         </div>
                         <div>
-                          <h2 className="text-xl font-bold">{user.displayName || 'Road Guardian'}</h2>
+                          <h2 className="text-xl font-bold">{user.name || 'Road Guardian'}</h2>
                           <p className="text-blue-100/60 text-xs font-medium">{user.email}</p>
                           <div className="mt-2 flex items-center gap-2 bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider">
                             <Award className="w-3 h-3" />
@@ -518,11 +446,11 @@ export default function App() {
                       {/* Stats Cards */}
                       <div className="grid grid-cols-2 gap-4">
                         <div className="bg-[#f7fafc] p-5 rounded-3xl border border-[#e2e8f0] flex flex-col items-center text-center">
-                          <p className="text-3xl font-black text-[#1a365d] mb-1">{potholes.filter(p => p.userId === user.uid).length}</p>
+                          <p className="text-3xl font-black text-[#1a365d] mb-1">{potholes.filter(p => p.userId === user._id).length}</p>
                           <p className="text-[10px] font-bold text-[#718096] uppercase tracking-widest">Reports</p>
                         </div>
                         <div className="bg-[#f7fafc] p-5 rounded-3xl border border-[#e2e8f0] flex flex-col items-center text-center">
-                          <p className="text-3xl font-black text-[#1a365d] mb-1">{potholes.filter(p => p.userId === user.uid).length * 50}</p>
+                          <p className="text-3xl font-black text-[#1a365d] mb-1">{potholes.filter(p => p.userId === user._id).length * 50}</p>
                           <p className="text-[10px] font-bold text-[#718096] uppercase tracking-widest">Points</p>
                         </div>
                       </div>
@@ -534,7 +462,7 @@ export default function App() {
                           <ProfileMenuItem icon={<Bell className="w-5 h-5" />} label="Notifications" />
                           <ProfileMenuItem icon={<Shield className="w-5 h-5" />} label="Privacy & Security" />
                           <ProfileMenuItem icon={<Award className="w-5 h-5" />} label="My Achievements" />
-                          {userRole === 'admin' && (
+                          {user.role === 'admin' && (
                             <button 
                               onClick={() => navigate('/admin')}
                               className="w-full flex items-center justify-between p-4 bg-emerald-50 text-emerald-600 rounded-2xl font-bold hover:bg-emerald-100 transition-all"
@@ -681,4 +609,3 @@ function InfoIcon({ className }: { className?: string }) {
     </svg>
   );
 }
-

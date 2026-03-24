@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Upload, MapPin, CheckCircle2, AlertTriangle, Info, ArrowLeft, Loader2, Camera, X } from 'lucide-react';
 import { motion } from 'motion/react';
-import { uploadPotholeImage } from '../services/storageService';
+import { useConvex } from 'convex/react';
+import { api } from '../../convex/_generated/api';
+import { uploadToConvex } from '../services/storageService';
+import { Id } from '../../convex/_generated/dataModel';
 
 interface ReportViewProps {
   onBack: () => void;
@@ -10,6 +13,7 @@ interface ReportViewProps {
 }
 
 export default function ReportView({ onBack, onSubmit, userId }: ReportViewProps) {
+  const convex = useConvex();
   const [severity, setSeverity] = useState<'low' | 'medium' | 'high'>('medium');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -71,11 +75,13 @@ export default function ReportView({ onBack, onSubmit, userId }: ReportViewProps
     setIsSubmitting(true);
     
     try {
-      const reportId = `report_${Date.now()}`;
-      let reportImageUrl = '';
+      let reportImageId: string | undefined;
+      let reportImageUrl: string | undefined;
       
       try {
-        reportImageUrl = await uploadPotholeImage(selectedFile, `reports/${userId}/${reportId}.jpg`);
+        reportImageId = await uploadToConvex(convex, selectedFile);
+        // resolve to URL so we have it for older views / map markers
+        reportImageUrl = await convex.query(api.storage.getImageUrl, { storageId: reportImageId as Id<"_storage"> }) as string;
       } catch (uploadError: any) {
         console.error("Upload error:", uploadError);
         throw new Error(`Photo upload failed: ${uploadError.message || 'Check storage permissions'}`);
@@ -87,6 +93,7 @@ export default function ReportView({ onBack, onSubmit, userId }: ReportViewProps
         latitude: location?.lat || 40.7128,
         longitude: location?.lng || -74.0060,
         address: location?.address || 'Unknown Location',
+        reportImageId,
         reportImageUrl
       });
     } catch (error: any) {

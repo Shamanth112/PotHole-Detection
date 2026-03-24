@@ -11,8 +11,9 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@auth/core": "^0.37.4",
+    "@convex-dev/auth": "^0.0.91",
     "@google/genai": "^1.29.0",
-    "@supabase/supabase-js": "^2.99.3",
     "@tailwindcss/vite": "^4.1.14",
     "@tensorflow-models/coco-ssd": "^2.2.3",
     "@tensorflow/tfjs": "^4.22.0",
@@ -20,9 +21,9 @@
     "@vitejs/plugin-react": "^5.0.4",
     "canvas-confetti": "^1.9.4",
     "clsx": "^2.1.1",
+    "convex": "^1.34.0",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
-    "firebase": "^12.11.0",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "onnxruntime-web": "^1.24.3",
