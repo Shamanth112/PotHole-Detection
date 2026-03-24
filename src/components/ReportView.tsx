@@ -2,9 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Upload, MapPin, CheckCircle2, AlertTriangle, Info, ArrowLeft, Loader2, Camera, X } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useConvex } from 'convex/react';
-import { api } from '../../convex/_generated/api';
+import { api } from '@/convex/_generated/api';
 import { uploadToConvex } from '../services/storageService';
-import { Id } from '../../convex/_generated/dataModel';
+import { Id } from '@/convex/_generated/dataModel';
 
 interface ReportViewProps {
   onBack: () => void;

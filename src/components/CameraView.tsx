@@ -4,8 +4,8 @@ import { useConvex } from 'convex/react';
 import { Camera, AlertTriangle, ShieldCheck, ArrowLeft, Zap, Activity, PackageOpen, MapPin, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { uploadToConvex } from '../services/storageService';
-import { api } from '../../convex/_generated/api';
-import { Id } from '../../convex/_generated/dataModel';
+import { api } from '@/convex/_generated/api';
+import { Id } from '@/convex/_generated/dataModel';
 
 interface CameraViewProps {
   onDetection: (detection: Detection, imageUrl: string) => void;

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useAuthActions } from '@convex-dev/auth/react';
 import { useQuery, useMutation, useConvex } from 'convex/react';
-import { api } from '../convex/_generated/api';
+import { api } from '@/convex/_generated/api';
 import HomeView from './components/HomeView';
 import ReportView from './components/ReportView';
 import CameraView from './components/CameraView';
@@ -34,7 +34,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import confetti from 'canvas-confetti';
-import { Id } from '../convex/_generated/dataModel';
+import { Id } from '@/convex/_generated/dataModel';
 
 type Tab = 'home' | 'map' | 'history' | 'scan' | 'profile' | 'report';
 

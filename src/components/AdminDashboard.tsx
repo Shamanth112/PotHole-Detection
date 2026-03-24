@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { useAuthActions } from '@convex-dev/auth/react';
-import { api } from '../../convex/_generated/api';
+import { api } from '@/convex/_generated/api';
 import { 
   UserPlus, Users, ShieldCheck, Mail, Trash2, Loader2, 
   MapPin, Plus, AlertTriangle, CheckCircle2, Clock, 
@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ImageViewer from './ImageViewer';
-import { Id } from '../../convex/_generated/dataModel';
+import { Id } from '@/convex/_generated/dataModel';
 
 type AdminTab = 'stats' | 'users' | 'potholes' | 'permitted';
 

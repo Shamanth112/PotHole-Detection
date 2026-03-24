@@ -3,11 +3,11 @@ import { Pothole } from '../hooks/usePotholes';
 import { MapPin, User, Navigation, Clock, ShieldAlert, CheckCircle2, Loader2, AlertCircle, Camera, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useQuery, useMutation } from 'convex/react';
-import { api } from '../../convex/_generated/api';
+import { api } from '@/convex/_generated/api';
 import { useConvex } from 'convex/react';
 import { uploadToConvex } from '../services/storageService';
 import ImageViewer from './ImageViewer';
-import { Id } from '../../convex/_generated/dataModel';
+import { Id } from '@/convex/_generated/dataModel';
 
 interface MunicipalDashboardProps {
   potholes?: Pothole[]; // Kept for backward compat, but we use the query directly below

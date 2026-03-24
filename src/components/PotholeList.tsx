@@ -3,9 +3,9 @@ import { Pothole } from '../hooks/usePotholes';
 import { MapPin, Clock, ChevronRight, AlertTriangle, Info, Trash2, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useMutation } from 'convex/react';
-import { api } from '../../convex/_generated/api';
+import { api } from '@/convex/_generated/api';
 import ImageViewer from './ImageViewer';
-import { Id } from '../../convex/_generated/dataModel';
+import { Id } from '@/convex/_generated/dataModel';
 
 interface PotholeListProps {
   potholes: Pothole[];

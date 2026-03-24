@@ -1,5 +1,5 @@
 import { useConvex } from 'convex/react';
-import { api } from '../../convex/_generated/api';
+import { api } from '@/convex/_generated/api';
 
 /**
  * Upload a File or Blob to Convex file storage.
