@@ -69,7 +69,7 @@ export async function loadModel(): Promise<void> {
     // Fix: point wasmPaths to jsDelivr CDN so ALL ORT runtime files
     // (including .jsep.mjs / .jsep.wasm) are fetched from a source that
     // actually has them, with no SharedArrayBuffer requirement.
-    const ORT_VERSION = '1.21.0'; // stable release that matches our API surface
+    const ORT_VERSION = '1.24.3'; // must match installed onnxruntime-web version EXACTLY
     ort.env.wasm.wasmPaths = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ORT_VERSION}/dist/`;
     (ort.env.wasm as any).numThreads = 1;
     // Disable web worker proxy — we don't ship an ort-wasm-node worker
