@@ -2,8 +2,13 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import { authTables } from "@convex-dev/auth/server";
 
+// Don't spread authTables - let Convex Auth handle auth internally
+// We only define our app-specific tables
 export default defineSchema({
-  ...authTables,
+  // Use auth tables for authentication
+  accounts: authTables.accounts,
+  sessions: authTables.sessions,
+  verificationCodes: authTables.verificationCodes,
 
   users: defineTable({
     // Convex Auth links via tokenIdentifier
@@ -12,9 +17,7 @@ export default defineSchema({
     name: v.optional(v.string()),
     avatarUrl: v.optional(v.string()),
     role: v.union(v.literal("citizen"), v.literal("municipal"), v.literal("admin")),
-  })
-    .index("by_token", ["tokenIdentifier"])
-    .index("by_email", ["email"]),
+  }).index("by_token", ["tokenIdentifier"]),
 
   potholes: defineTable({
     userId: v.optional(v.id("users")),
