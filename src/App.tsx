@@ -137,14 +137,22 @@ export default function App() {
       console.error("Error reporting pothole:", error);
       if (!isAuto) {
         alert("Failed to submit report: " + (error?.message || JSON.stringify(error)));
+      } else {
+        // Log auto-report errors to help debug
+        console.error("[Auto-Report] Failed to report pothole:", error?.message || error);
       }
       throw error; // re-throw so ReportView can handle it
     }
   };
 
   const handleDetection = (detection: any, imageUrl: string) => {
-    if (!userLocation) return;
-    
+    if (!userLocation) {
+      console.warn("[Auto-Report] No user location, skipping report");
+      return;
+    }
+
+    console.log("[Auto-Report] Reporting pothole:", { lat: userLocation.lat, lng: userLocation.lng, score: detection.score });
+
     // Auto-report to municipal silently
     handleReportPothole({
       latitude: userLocation.lat,
