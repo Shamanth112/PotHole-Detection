@@ -2,13 +2,8 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import { authTables } from "@convex-dev/auth/server";
 
-// Don't spread authTables - let Convex Auth handle auth internally
-// We only define our app-specific tables
 export default defineSchema({
-  // Use auth tables for authentication
-  accounts: authTables.accounts,
-  sessions: authTables.sessions,
-  verificationCodes: authTables.verificationCodes,
+  ...authTables,
 
   users: defineTable({
     // Convex Auth links via tokenIdentifier
