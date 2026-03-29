@@ -43,3 +43,4 @@ export default defineSchema({
     role: v.union(v.literal("citizen"), v.literal("municipal"), v.literal("admin")),
   }).index("by_email", ["email"]),
 });
+
