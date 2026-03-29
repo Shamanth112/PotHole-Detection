@@ -122,6 +122,16 @@ export default function CameraView({ onDetection, onBack, gpsActive, userLocatio
   }, []);
 
   // ── Canvas sync ────────────────────────────────────────────────────
+  const syncCanvas = useCallback(() => {
+    const canvas = canvasRef.current, video = videoRef.current;
+    if (!canvas || !video) return;
+    if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+    }
+  }, []);
+
+  // ── Draw overlay ────────────────────────────────────────────────────
   const drawOverlay = useCallback((detections: Detection[]) => {
     const canvas = canvasRef.current, video = videoRef.current;
     if (!canvas || !video) return;
