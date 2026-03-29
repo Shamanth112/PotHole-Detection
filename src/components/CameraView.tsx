@@ -121,15 +121,7 @@ export default function CameraView({ onDetection, onBack, gpsActive, userLocatio
     };
   }, []);
 
-  // ── Canvas sync ──────────────────────────────────────────────────────────
-  const syncCanvas = useCallback(() => {
-    const v = videoRef.current, c = canvasRef.current;
-    if (!v || !c) return;
-    const r = v.getBoundingClientRect();
-    if (c.width !== r.width || c.height !== r.height) { c.width = r.width; c.height = r.height; }
-  }, []);
-
-  // ── Drawing ──────────────────────────────────────────────────────────────
+  // ── Canvas sync ────────────────────────────────────────────────────
   const drawOverlay = useCallback((detections: Detection[]) => {
     const canvas = canvasRef.current, video = videoRef.current;
     if (!canvas || !video) return;
@@ -139,61 +131,40 @@ export default function CameraView({ onDetection, onBack, gpsActive, userLocatio
     const W = canvas.width, H = canvas.height;
     const scaleX = W / (video.videoWidth || 1);
     const scaleY = H / (video.videoHeight || 1);
-    const ROI_Y = H * 0.25;
 
     ctx.clearRect(0, 0, W, H);
 
-    // Grid
-    ctx.save();
-    ctx.strokeStyle = 'rgba(59,130,246,0.06)';
-    ctx.lineWidth = 0.5;
-    const g = 36;
-    for (let x = 0; x < W; x += g) { ctx.beginPath(); ctx.moveTo(x, ROI_Y); ctx.lineTo(x, H); ctx.stroke(); }
-    for (let y = ROI_Y; y < H; y += g) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
-    ctx.restore();
-
-    // ROI line
-    ctx.save();
-    ctx.setLineDash([6, 6]);
-    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(0, ROI_Y); ctx.lineTo(W, ROI_Y); ctx.stroke();
-    ctx.restore();
-
-    // Boxes
+    // Boxes — full frame, no ROI restriction
     detections.forEach(d => {
       if (d.class !== 'pothole') return;
       const [bx, by, bw, bh] = d.bbox;
       const x = bx * scaleX, y = by * scaleY, w = bw * scaleX, h = bh * scaleY;
       const pct = Math.round(d.score * 100);
-      const onRoad = (by + bh / 2) * scaleY > ROI_Y;
-      const color = onRoad ? (pct >= 80 ? '#ef4444' : pct >= 60 ? '#f97316' : '#eab308') : 'rgba(239,68,68,0.3)';
+      const color = pct >= 80 ? '#ef4444' : pct >= 60 ? '#f97316' : '#eab308';
 
       ctx.save();
-      ctx.shadowColor = color; ctx.shadowBlur = onRoad ? 18 : 4;
-      ctx.fillStyle = onRoad ? `${color}12` : `${color}06`;
+      ctx.shadowColor = color; ctx.shadowBlur = 18;
+      ctx.fillStyle = `${color}12`;
       ctx.fillRect(x, y, w, h);
-      drawBracketBox(ctx, x, y, w, h, color, onRoad ? 2.5 : 1.2);
+      drawBracketBox(ctx, x, y, w, h, color, 2.5);
       ctx.restore();
 
-      if (onRoad) {
-        const label = `POTHOLE  ${pct}%`;
-        ctx.save();
-        ctx.font = 'bold 11px monospace';
-        const tw = ctx.measureText(label).width + 16;
-        const ly = y > 28 ? y - 10 : y + h + 10;
-        ctx.fillStyle = color;
-        ctx.beginPath(); (ctx as any).roundRect(x, ly - 14, tw, 18, 4); ctx.fill();
-        ctx.fillStyle = '#fff'; ctx.fillText(label, x + 8, ly);
-        ctx.restore();
+      const label = `POTHOLE  ${pct}%`;
+      ctx.save();
+      ctx.font = 'bold 11px monospace';
+      const tw = ctx.measureText(label).width + 16;
+      const ly = y > 28 ? y - 10 : y + h + 10;
+      ctx.fillStyle = color;
+      ctx.beginPath(); (ctx as any).roundRect(x, ly - 14, tw, 18, 4); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.fillText(label, x + 8, ly);
+      ctx.restore();
 
-        const cx = x + w / 2, cy = y + h / 2, cs = 9;
-        ctx.save();
-        ctx.strokeStyle = `${color}aa`; ctx.lineWidth = 1.5;
-        ctx.beginPath(); ctx.moveTo(cx - cs, cy); ctx.lineTo(cx + cs, cy); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(cx, cy - cs); ctx.lineTo(cx, cy + cs); ctx.stroke();
-        ctx.restore();
-      }
+      const cx = x + w / 2, cy = y + h / 2, cs = 9;
+      ctx.save();
+      ctx.strokeStyle = `${color}aa`; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(cx - cs, cy); ctx.lineTo(cx + cs, cy); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx, cy - cs); ctx.lineTo(cx, cy + cs); ctx.stroke();
+      ctx.restore();
     });
   }, [syncCanvas]);
 
@@ -219,10 +190,7 @@ export default function CameraView({ onDetection, onBack, gpsActive, userLocatio
         isProcessingRef.current = true;
         detectPotholes(video).then(results => {
           const videoH = video.videoHeight || 1;
-          const filtered = results.filter(d =>
-            d.class === 'pothole' && d.score >= 0.25 &&
-            (d.bbox[1] + d.bbox[3] / 2) / videoH > 0.25
-          );
+          const filtered = results.filter(d => d.class === 'pothole' && d.score >= 0.25);
           lastDetectionsRef.current = results;
           setLiveDetections(filtered);
 
@@ -444,23 +412,6 @@ export default function CameraView({ onDetection, onBack, gpsActive, userLocatio
             <Camera className="w-5 h-5 text-white" />
           </button>
         </div>
-
-        {/* ── Road zone label ── */}
-        <div className="absolute pointer-events-none z-10" style={{ top: '25%', left: 0, right: 0 }}>
-          <div className="flex items-center justify-center">
-            <span className="px-3 py-0.5 bg-blue-500/20 border border-blue-500/30 rounded-full text-[8px] font-black text-blue-300 uppercase tracking-widest">
-              ▼ Road Patrol Zone ▼
-            </span>
-          </div>
-        </div>
-
-        {/* ── Scanning line ── */}
-        <motion.div
-          animate={{ top: ['25%', '100%', '25%'] }}
-          transition={{ duration: 3.2, repeat: Infinity, ease: 'linear' }}
-          className="absolute left-0 right-0 h-px z-10 pointer-events-none"
-          style={{ background: 'linear-gradient(90deg,transparent,rgba(239,68,68,0.55),transparent)', boxShadow: '0 0 10px 2px rgba(239,68,68,0.25)' }}
-        />
 
         {/* ── Live alert ── */}
         <AnimatePresence>

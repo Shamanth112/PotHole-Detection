@@ -27,7 +27,7 @@ export const list = query({
 
     const rows = await ctx.db
       .query("potholes")
-      .withIndex("by_user", (q: any) => q.eq("userId", caller._id))
+      .withIndex("by_user", (q: any) => q.eq("userId", caller.userId))
       .order("desc")
       .take(50);
     return rows;
