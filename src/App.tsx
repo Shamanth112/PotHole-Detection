@@ -123,7 +123,9 @@ export default function App() {
         reportImageId: data.reportImageId as any,
         userName: user.name ?? 'Road Guardian',
       });
-      
+
+      console.log("[Auto-Report] SUCCESS - pothole reported:", data);
+
       if (!isAuto) {
         setActiveTab('history');
         confetti({

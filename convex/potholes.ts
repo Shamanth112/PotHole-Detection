@@ -20,17 +20,20 @@ export const list = query({
     const caller = await getCallerProfile(ctx);
     if (!caller) return [];
 
+    // Admin/Municipal see all potholes
     if (caller.role === "admin" || caller.role === "municipal") {
       const rows = await ctx.db.query("potholes").order("desc").take(200);
       return rows;
     }
 
-    const rows = await ctx.db
-      .query("potholes")
-      .withIndex("by_user", (q: any) => q.eq("userId", caller.userId))
-      .order("desc")
-      .take(50);
-    return rows;
+    // Citizens see only their own potholes (by auth userId)
+    console.log("[list] filtering by userId:", caller.userId);
+
+    // First get all potholes then filter manually
+    const allRows = await ctx.db.query("potholes").order("desc").take(100);
+    const filtered = allRows.filter(p => p.userId === caller.userId);
+    console.log("[list] total:", allRows.length, "filtered:", filtered.length);
+    return filtered;
   },
 });
 
@@ -60,6 +63,8 @@ export const report = mutation({
   handler: async (ctx, args) => {
     const caller = await getCallerProfile(ctx);
     if (!caller) throw new Error("Not authenticated");
+
+    console.log("[report] Inserting with userId:", caller.userId);
 
     await ctx.db.insert("potholes", {
       userId: caller.userId,
