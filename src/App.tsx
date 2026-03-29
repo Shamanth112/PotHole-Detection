@@ -112,7 +112,11 @@ export default function App() {
   };
 
   const handleReportPothole = async (data: { latitude: number; longitude: number; severity: string; address?: string; reportImageUrl?: string; reportImageId?: string }, isAuto = false) => {
-    if (!user) return;
+    if (!user) {
+      console.error("[handleReportPothole] No user logged in!");
+      return;
+    }
+    console.log("[handleReportPothole] User:", user._id, "userId:", user.userId);
     try {
       await reportPotholeBase({
         latitude: data.latitude,

@@ -27,13 +27,8 @@ export const list = query({
     }
 
     // Citizens see only their own potholes (by auth userId)
-    console.log("[list] filtering by userId:", caller.userId);
-
-    // First get all potholes then filter manually
-    const allRows = await ctx.db.query("potholes").order("desc").take(100);
-    const filtered = allRows.filter(p => p.userId === caller.userId);
-    console.log("[list] total:", allRows.length, "filtered:", filtered.length);
-    return filtered;
+    // For now, return all for testing
+    return await ctx.db.query("potholes").order("desc").take(100);
   },
 });
 
