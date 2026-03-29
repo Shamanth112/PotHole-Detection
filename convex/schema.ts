@@ -17,7 +17,9 @@ export default defineSchema({
     name: v.optional(v.string()),
     avatarUrl: v.optional(v.string()),
     role: v.union(v.literal("citizen"), v.literal("municipal"), v.literal("admin")),
-  }).index("by_token", ["tokenIdentifier"]),
+  })
+    .index("by_token", ["tokenIdentifier"])
+    .index("by_email", ["email"]),
 
   potholes: defineTable({
     userId: v.optional(v.id("users")),
