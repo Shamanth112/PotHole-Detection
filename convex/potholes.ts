@@ -1,13 +1,13 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, MutationCtx, QueryCtx } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 
-async function getCallerProfile(ctx: any) {
-  const identity = await ctx.auth.getUserIdentity();
-  if (!identity) return null;
+async function getCallerProfile(ctx: QueryCtx | MutationCtx) {
+  const userId = await getAuthUserId(ctx);
+  if (!userId) return null;
   return await ctx.db
-    .query("users")
-    .withIndex("by_token", (q: any) => q.eq("tokenIdentifier", identity.tokenIdentifier))
+    .query("profiles")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
     .unique();
 }
 
@@ -62,7 +62,7 @@ export const report = mutation({
     if (!caller) throw new Error("Not authenticated");
 
     await ctx.db.insert("potholes", {
-      userId: caller._id,
+      userId: caller.userId,
       userName: args.userName ?? caller.name ?? "Road Guardian",
       latitude: args.latitude,
       longitude: args.longitude,
@@ -152,7 +152,7 @@ export const addManual = mutation({
     if (!caller || caller.role !== "admin") throw new Error("Unauthorized");
 
     await ctx.db.insert("potholes", {
-      userId: caller._id,
+      userId: caller.userId,
       userName: "Admin Manual Entry",
       latitude: args.latitude,
       longitude: args.longitude,

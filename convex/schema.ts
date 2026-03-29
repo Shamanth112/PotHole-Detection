@@ -5,15 +5,16 @@ import { authTables } from "@convex-dev/auth/server";
 export default defineSchema({
   ...authTables,
 
-  users: defineTable({
-    // Convex Auth links via tokenIdentifier
-    tokenIdentifier: v.string(),
+  // App-specific profile data separate from auth's built-in users table
+  profiles: defineTable({
+    // Links to the auth userId (_id from the authTables users table)
+    userId: v.id("users"),
     email: v.string(),
     name: v.optional(v.string()),
     avatarUrl: v.optional(v.string()),
     role: v.union(v.literal("citizen"), v.literal("municipal"), v.literal("admin")),
   })
-    .index("by_token", ["tokenIdentifier"])
+    .index("by_user", ["userId"])
     .index("by_email", ["email"]),
 
   potholes: defineTable({

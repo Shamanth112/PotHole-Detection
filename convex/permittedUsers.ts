@@ -1,12 +1,13 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, MutationCtx, QueryCtx } from "./_generated/server";
+import { getAuthUserId } from "@convex-dev/auth/server";
 
-async function getCallerProfile(ctx: any) {
-  const identity = await ctx.auth.getUserIdentity();
-  if (!identity) return null;
+async function getCallerProfile(ctx: QueryCtx | MutationCtx) {
+  const userId = await getAuthUserId(ctx);
+  if (!userId) return null;
   return await ctx.db
-    .query("users")
-    .withIndex("by_token", (q: any) => q.eq("tokenIdentifier", identity.tokenIdentifier))
+    .query("profiles")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
     .unique();
 }
 

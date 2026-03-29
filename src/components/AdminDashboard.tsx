@@ -105,7 +105,7 @@ export default function AdminDashboard() {
     if (!window.confirm(`Are you sure you want to delete ${user.email} from registered users?`)) return;
     setDeletingId(user._id);
     try {
-      await deleteUserMutation({ userId: user._id });
+      await deleteUserMutation({ profileId: user._id });
       setSuccess(`User ${user.email} deleted.`);
     } catch (err: any) {
       setError(`Failed to delete user: ${err.message}`);
@@ -114,9 +114,9 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleEditUserRole = async (userId: Id<"users">) => {
+  const handleEditUserRole = async (profileId: Id<"profiles">) => {
     try {
-      await updateUserRoleMutation({ userId, role: editUserRole as any });
+      await updateUserRoleMutation({ profileId, role: editUserRole as any });
       setEditingUserId(null);
       setSuccess(`User role updated to ${editUserRole}.`);
     } catch (err: any) {
@@ -453,7 +453,7 @@ export default function AdminDashboard() {
                             <option value="municipal">Municipal</option>
                             <option value="admin">Admin</option>
                           </select>
-                          <button onClick={() => handleEditUserRole(u._id)} className="p-1 text-emerald-500 hover:text-emerald-400">
+                          <button onClick={() => handleEditUserRole(u._id as Id<"profiles">)} className="p-1 text-emerald-500 hover:text-emerald-400">
                             <Save className="w-4 h-4" />
                           </button>
                           <button onClick={() => setEditingUserId(null)} className="p-1 text-zinc-500 hover:text-white">

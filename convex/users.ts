@@ -2,22 +2,25 @@ import { v } from "convex/values";
 import {
   mutation,
   query,
-  internalMutation,
+  MutationCtx,
+  QueryCtx,
 } from "./_generated/server";
-import { auth } from "./auth";
 import { getAuthUserId } from "@convex-dev/auth/server";
 
 const ADMIN_EMAIL = "shamanth.p2007@gmail.com";
 
 // ─── Internal helper ──────────────────────────────────────
 
-async function getCallerProfile(ctx: any) {
+async function getCallerProfile(ctx: QueryCtx | MutationCtx) {
   const userId = await getAuthUserId(ctx);
   if (!userId) return null;
-  return await ctx.db.get(userId);
+  return await ctx.db
+    .query("profiles")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .unique();
 }
 
-// ─── Upsert user on every login ───────────────────────────
+// ─── Upsert profile on every login ────────────────────────
 
 export const upsertProfile = mutation({
   args: {
@@ -29,25 +32,22 @@ export const upsertProfile = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
-    // Check if a users row already exists
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("No identity");
+    const email = args.email.toLowerCase().trim();
 
     const existing = await ctx.db
-      .query("users")
-      .withIndex("by_token", (q: any) => q.eq("tokenIdentifier", identity.tokenIdentifier))
+      .query("profiles")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
       .unique();
 
     // Determine role
     let role: "citizen" | "municipal" | "admin" = "citizen";
-    const email = args.email.toLowerCase().trim();
 
     if (email === ADMIN_EMAIL) {
       role = "admin";
     } else {
       const permitted = await ctx.db
         .query("permittedUsers")
-        .withIndex("by_email", (q: any) => q.eq("email", email))
+        .withIndex("by_email", (q) => q.eq("email", email))
         .unique();
       if (permitted) {
         role = permitted.role;
@@ -55,7 +55,6 @@ export const upsertProfile = mutation({
     }
 
     if (existing) {
-      // Update name/avatar but preserve role unless it changed in permittedUsers
       await ctx.db.patch(existing._id, {
         name: args.name ?? existing.name,
         avatarUrl: args.avatarUrl ?? existing.avatarUrl,
@@ -63,8 +62,8 @@ export const upsertProfile = mutation({
       });
       return existing._id;
     } else {
-      const id = await ctx.db.insert("users", {
-        tokenIdentifier: identity.tokenIdentifier,
+      const id = await ctx.db.insert("profiles", {
+        userId,
         email,
         name: args.name,
         avatarUrl: args.avatarUrl,
@@ -80,13 +79,12 @@ export const upsertProfile = mutation({
 export const getSelf = query({
   args: {},
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return null;
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_token", (q: any) => q.eq("tokenIdentifier", identity.tokenIdentifier))
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    return await ctx.db
+      .query("profiles")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
       .unique();
-    return user;
   },
 });
 
@@ -97,29 +95,32 @@ export const listAll = query({
   handler: async (ctx) => {
     const caller = await getCallerProfile(ctx);
     if (!caller || caller.role !== "admin") return [];
-    return await ctx.db.query("users").collect();
+    return await ctx.db.query("profiles").collect();
   },
 });
 
 // ─── Admin: update role ───────────────────────────────────
 
 export const updateRole = mutation({
-  args: { userId: v.id("users"), role: v.union(v.literal("citizen"), v.literal("municipal"), v.literal("admin")) },
+  args: {
+    profileId: v.id("profiles"),
+    role: v.union(v.literal("citizen"), v.literal("municipal"), v.literal("admin")),
+  },
   handler: async (ctx, args) => {
     const caller = await getCallerProfile(ctx);
     if (!caller || caller.role !== "admin") throw new Error("Unauthorized");
-    await ctx.db.patch(args.userId, { role: args.role });
+    await ctx.db.patch(args.profileId, { role: args.role });
   },
 });
 
 // ─── Admin: delete user ───────────────────────────────────
 
 export const deleteUser = mutation({
-  args: { userId: v.id("users") },
+  args: { profileId: v.id("profiles") },
   handler: async (ctx, args) => {
     const caller = await getCallerProfile(ctx);
     if (!caller || caller.role !== "admin") throw new Error("Unauthorized");
-    await ctx.db.delete(args.userId);
+    await ctx.db.delete(args.profileId);
   },
 });
 
@@ -128,13 +129,13 @@ export const deleteUser = mutation({
 export const updateAvatar = mutation({
   args: { avatarUrl: v.string() },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_token", (q: any) => q.eq("tokenIdentifier", identity.tokenIdentifier))
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const profile = await ctx.db
+      .query("profiles")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
       .unique();
-    if (!user) throw new Error("User not found");
-    await ctx.db.patch(user._id, { avatarUrl: args.avatarUrl });
+    if (!profile) throw new Error("Profile not found");
+    await ctx.db.patch(profile._id, { avatarUrl: args.avatarUrl });
   },
 });

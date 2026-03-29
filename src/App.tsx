@@ -446,11 +446,11 @@ export default function App() {
                       {/* Stats Cards */}
                       <div className="grid grid-cols-2 gap-4">
                         <div className="bg-[#f7fafc] p-5 rounded-3xl border border-[#e2e8f0] flex flex-col items-center text-center">
-                          <p className="text-3xl font-black text-[#1a365d] mb-1">{potholes.filter(p => p.userId === user._id).length}</p>
+                          <p className="text-3xl font-black text-[#1a365d] mb-1">{potholes.filter(p => p.userId === user.userId).length}</p>
                           <p className="text-[10px] font-bold text-[#718096] uppercase tracking-widest">Reports</p>
                         </div>
                         <div className="bg-[#f7fafc] p-5 rounded-3xl border border-[#e2e8f0] flex flex-col items-center text-center">
-                          <p className="text-3xl font-black text-[#1a365d] mb-1">{potholes.filter(p => p.userId === user._id).length * 50}</p>
+                          <p className="text-3xl font-black text-[#1a365d] mb-1">{potholes.filter(p => p.userId === user.userId).length * 50}</p>
                           <p className="text-[10px] font-bold text-[#718096] uppercase tracking-widest">Points</p>
                         </div>
                       </div>
