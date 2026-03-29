@@ -60,10 +60,20 @@ export async function loadModel(): Promise<void> {
   modelLoading = true;
 
   try {
-    // Serve WASM + worker from public/ (ort-wasm-simd-threaded.wasm + .mjs committed to repo)
-    // v1.24.3 only ships threaded variants — numThreads=1 uses 1 thread without SharedArrayBuffer
-    ort.env.wasm.wasmPaths = '/';
+    // ── ORT WASM runtime paths ─────────────────────────────────────────────
+    // ORT Web 1.19+ auto-loads a JSEP (WebGPU) module even when you only
+    // request the 'wasm' provider. The .jsep.mjs file only lives inside the
+    // npm package — it was never put in public/ — so Vercel returns a 404
+    // which kills the ENTIRE runtime with "no available backend found".
+    //
+    // Fix: point wasmPaths to jsDelivr CDN so ALL ORT runtime files
+    // (including .jsep.mjs / .jsep.wasm) are fetched from a source that
+    // actually has them, with no SharedArrayBuffer requirement.
+    const ORT_VERSION = '1.21.0'; // stable release that matches our API surface
+    ort.env.wasm.wasmPaths = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ORT_VERSION}/dist/`;
     (ort.env.wasm as any).numThreads = 1;
+    // Disable web worker proxy — we don't ship an ort-wasm-node worker
+    (ort.env.wasm as any).proxy = false;
 
     console.log(`[YOLO] Loading model from: ${MODEL_URL}`);
     session = await ort.InferenceSession.create(MODEL_URL, {
