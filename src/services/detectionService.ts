@@ -33,6 +33,7 @@ const IOU_THRESHOLD = 0.45;  // NMS IoU threshold
 
 // ── Globals ──────────────────────────────────────────────────────────────────
 let session: ort.InferenceSession | null = null;
+let modelLoading = false;       // guard against concurrent load calls
 let modelLoadFailed = false;
 let modelLoadError = '';
 let loggedShapeOnce = false; // only log output shape once to avoid spam
@@ -46,7 +47,17 @@ export interface Detection {
 
 // ── Model loading ─────────────────────────────────────────────────────────────
 export async function loadModel(): Promise<void> {
-  if (session || modelLoadFailed) return;
+  // Already loaded
+  if (session) return;
+  // Prevent concurrent load calls (e.g. StrictMode double-invoke)
+  if (modelLoading) {
+    // Wait until the ongoing load resolves
+    while (modelLoading) await new Promise(r => setTimeout(r, 50));
+    if (session) return;
+  }
+  // Reset failure flag so user can retry after an error
+  modelLoadFailed = false;
+  modelLoading = true;
 
   try {
     // Serve WASM + worker from public/ (ort-wasm-simd-threaded.wasm + .mjs committed to repo)
@@ -60,7 +71,22 @@ export async function loadModel(): Promise<void> {
       graphOptimizationLevel: 'all',
     });
     console.log(`[YOLO] Model loaded. Inputs: ${session.inputNames}, Outputs: ${session.outputNames}`);
+
+    // ── Warmup: run a blank inference to prime the WASM JIT so the first
+    //   real frame doesn't stall the UI thread.
+    try {
+      const dummyData = new Float32Array(1 * 3 * INPUT_SIZE * INPUT_SIZE);
+      const dummyTensor = new ort.Tensor('float32', dummyData, [1, 3, INPUT_SIZE, INPUT_SIZE]);
+      const feeds: Record<string, ort.Tensor> = {};
+      feeds[session.inputNames[0]] = dummyTensor;
+      await session.run(feeds);
+      console.log('[YOLO] Warmup inference complete — model is hot.');
+    } catch (warmupErr) {
+      // Warmup failure is non-fatal; log and continue
+      console.warn('[YOLO] Warmup inference failed (non-fatal):', warmupErr);
+    }
   } catch (err: any) {
+    session = null;
     modelLoadFailed = true;
     modelLoadError = err?.message || String(err);
     console.error('[YOLO] Model load failed:', err);
@@ -71,11 +97,23 @@ export async function loadModel(): Promise<void> {
       `Then set VITE_MODEL_URL=/best.onnx in your .env file.\n\n` +
       `Original error: ${modelLoadError}`
     );
+  } finally {
+    modelLoading = false;
   }
+}
+
+/** Reset model state so loadModel() can be called again after a failure */
+export function resetModel(): void {
+  session = null;
+  modelLoadFailed = false;
+  modelLoadError = '';
+  modelLoading = false;
+  loggedShapeOnce = false;
 }
 
 export function isModelLoaded() { return !!session; }
 export function getModelError() { return modelLoadError; }
+export function isModelLoading() { return modelLoading; }
 
 // ── Preprocessing: letterbox resize to 640×640 ────────────────────────────────
 function letterboxImage(

@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { loadModel, detectPotholes, isModelLoaded, getModelError, Detection } from '../services/detectionService';
+import { loadModel, detectPotholes, isModelLoaded, getModelError, resetModel, Detection } from '../services/detectionService';
 import { useConvex } from 'convex/react';
 import { Camera, AlertTriangle, ShieldCheck, ArrowLeft, Zap, Activity, PackageOpen, MapPin, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -64,6 +64,7 @@ export default function CameraView({ onDetection, onBack, gpsActive, userLocatio
   const fpsRef = useRef<{ frames: number; last: number }>({ frames: 0, last: Date.now() });
 
   const [modelStatus, setModelStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [modelErrorMsg, setModelErrorMsg] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [showShutter, setShowShutter] = useState(false);
   const [fps, setFps] = useState(0);
@@ -86,17 +87,33 @@ export default function CameraView({ onDetection, onBack, gpsActive, userLocatio
     }
   }, []);
 
+  // Track userLocation in a ref so the render loop doesn't restart on every GPS update
+  const userLocationRef = useRef(userLocation);
+  useEffect(() => { userLocationRef.current = userLocation; }, [userLocation]);
+
+  // ── Initialization: start camera + load model in PARALLEL ──────────────────
   useEffect(() => {
-    (async () => {
+    let cancelled = false;
+
+    const init = async () => {
+      // Start camera immediately — don't wait for model
+      startCamera().catch(err => console.error('[Camera] Failed to start:', err));
+
       try {
         await loadModel();
-        setModelStatus('ready');
-        await startCamera();
+        if (!cancelled) setModelStatus('ready');
       } catch (err: any) {
-        setModelStatus('error');
+        if (!cancelled) {
+          setModelErrorMsg(err?.message || String(err));
+          setModelStatus('error');
+        }
       }
-    })();
+    };
+
+    init();
+
     return () => {
+      cancelled = true;
       cancelAnimationFrame(animFrameRef.current);
       if (videoRef.current?.srcObject) {
         (videoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
@@ -214,7 +231,7 @@ export default function CameraView({ onDetection, onBack, gpsActive, userLocatio
             // Time throttle: at least 1.5 s between captures
             if (t - lastDetectionTime.current > 1500) {
               // Location dedup: don't re-report within MIN_REPORT_DISTANCE_M
-              const loc = userLocation;
+              const loc = userLocationRef.current; // use ref — no loop restart on GPS change
               const tooClose = loc ? lastReportLocations.current.some(
                 prev => haversineMetres(prev, loc) < MIN_REPORT_DISTANCE_M
               ) : false;
@@ -232,7 +249,7 @@ export default function CameraView({ onDetection, onBack, gpsActive, userLocatio
 
     animFrameRef.current = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(animFrameRef.current);
-  }, [modelStatus, drawOverlay, userLocation]);
+  }, [modelStatus, drawOverlay]); // userLocation is now read via ref — no restart on GPS updates
 
   // ── Capture + report ──────────────────────────────────────────────────────
   const captureAndReport = async (detection: Detection) => {
@@ -305,9 +322,27 @@ export default function CameraView({ onDetection, onBack, gpsActive, userLocatio
             <p className="text-emerald-400 font-mono text-xs pl-4">format=onnx imgsz=640</p>
           </div>
         </div>
-        <button onClick={onBack} className="flex items-center gap-2 px-6 py-3 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-sm font-bold transition-all">
-          <ArrowLeft className="w-4 h-4" /> Go Back
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={() => {
+              resetModel();
+              setModelErrorMsg('');
+              setModelStatus('loading');
+              loadModel()
+                .then(() => setModelStatus('ready'))
+                .catch(err => { setModelErrorMsg(err?.message || String(err)); setModelStatus('error'); });
+            }}
+            className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-bold transition-all"
+          >
+            <Zap className="w-4 h-4" /> Retry
+          </button>
+          <button onClick={onBack} className="flex items-center gap-2 px-6 py-3 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-sm font-bold transition-all">
+            <ArrowLeft className="w-4 h-4" /> Go Back
+          </button>
+        </div>
+        {modelErrorMsg && (
+          <p className="text-red-400/60 text-[10px] font-mono max-w-sm text-center break-all">{modelErrorMsg}</p>
+        )}
       </div>
     );
   }
