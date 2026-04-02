@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, FileText, Activity, CheckCircle2, ShieldAlert, Wifi, LayoutDashboard, ShieldCheck, ChevronRight } from 'lucide-react';
+import { Play, FileText, Activity, CheckCircle2, ShieldAlert, Wifi, LayoutDashboard, ShieldCheck, ChevronRight, MapPin } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 

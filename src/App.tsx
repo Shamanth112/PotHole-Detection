@@ -13,11 +13,11 @@ import AdminDashboard from './components/AdminDashboard';
 import OnboardingTour from './components/OnboardingTour';
 import { usePotholes } from './hooks/usePotholes';
 import { uploadToConvex } from './services/storageService';
-import { 
-  LayoutDashboard, 
-  Map as MapIcon, 
-  Camera, 
-  LogOut, 
+import {
+  LayoutDashboard,
+  Map as MapIcon,
+  Camera,
+  LogOut,
   ShieldAlert,
   Activity,
   Settings,
@@ -31,7 +31,8 @@ import {
   Bell,
   Award,
   Shield,
-  Loader2
+  Loader2,
+  FileText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import confetti from 'canvas-confetti';
@@ -283,11 +284,12 @@ export default function App() {
                   label="Live Map" 
                   data-tour="map"
                 />
-                <SidebarButton 
-                  active={activeTab === 'history'} 
-                  onClick={() => setActiveTab('history')} 
-                  icon={<History className="w-5 h-5" />} 
-                  label="Report History" 
+                <SidebarButton
+                  active={activeTab === 'history'}
+                  onClick={() => setActiveTab('history')}
+                  icon={<History className="w-5 h-5" />}
+                  label="Report History"
+                  data-tour="history"
                 />
                 <SidebarButton 
                   active={activeTab === 'scan'} 
@@ -296,12 +298,19 @@ export default function App() {
                   label="AI Scanner" 
                   data-tour="scan"
                 />
-                <SidebarButton 
-                  active={activeTab === 'profile'} 
-                  onClick={() => setActiveTab('profile')} 
-                  icon={<UserIcon className="w-5 h-5" />} 
-                  label="My Profile" 
+                <SidebarButton
+                  active={activeTab === 'profile'}
+                  onClick={() => setActiveTab('profile')}
+                  icon={<UserIcon className="w-5 h-5" />}
+                  label="My Profile"
                   data-tour="profile"
+                />
+                <SidebarButton
+                  active={activeTab === 'report'}
+                  onClick={() => setActiveTab('report')}
+                  icon={<FileText className="w-5 h-5" />}
+                  label="Report"
+                  data-tour="report"
                 />
                 {user.role === 'admin' && (
                   <SidebarButton 
@@ -522,22 +531,24 @@ export default function App() {
 
             {/* Bottom Navigation (Mobile Only) */}
             <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-[#e2e8f0] px-6 py-3 flex justify-between items-center z-50 shadow-[0_-10px_20px_-5px_rgba(0,0,0,0.05)]">
-              <NavButton 
-                active={activeTab === 'home'} 
-                onClick={() => setActiveTab('home')} 
-                icon={<HomeIcon className="w-6 h-6" />} 
-                label="Home" 
+              <NavButton
+                active={activeTab === 'home'}
+                onClick={() => setActiveTab('home')}
+                icon={<HomeIcon className="w-6 h-6" />}
+                label="Home"
+                data-tour="mobile-home"
               />
-              <NavButton 
-                active={activeTab === 'map'} 
-                onClick={() => setActiveTab('map')} 
-                icon={<MapIcon className="w-6 h-6" />} 
-                label="Map" 
+              <NavButton
+                active={activeTab === 'map'}
+                onClick={() => setActiveTab('map')}
+                icon={<MapIcon className="w-6 h-6" />}
+                label="Map"
+                data-tour="mobile-map"
               />
-              
+
               {/* Central Scan Button */}
-              <div className="relative -mt-12">
-                <button 
+              <div className="relative -mt-12" data-tour="mobile-scan">
+                <button
                   onClick={() => setActiveTab('scan')}
                   className={`w-16 h-16 rounded-full flex items-center justify-center shadow-2xl transition-all active:scale-90 ${
                     activeTab === 'scan' ? 'bg-[#1a365d] text-white' : 'bg-[#1a365d] text-white'
@@ -548,17 +559,19 @@ export default function App() {
                 <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] font-bold text-[#1a365d] uppercase tracking-widest">Scan</span>
               </div>
 
-              <NavButton 
-                active={activeTab === 'history'} 
-                onClick={() => setActiveTab('history')} 
-                icon={<History className="w-6 h-6" />} 
-                label="History" 
+              <NavButton
+                active={activeTab === 'history'}
+                onClick={() => setActiveTab('history')}
+                icon={<History className="w-6 h-6" />}
+                label="History"
+                data-tour="mobile-history"
               />
-              <NavButton 
-                active={activeTab === 'profile'} 
-                onClick={() => setActiveTab('profile')} 
-                icon={<UserIcon className="w-6 h-6" />} 
-                label="Profile" 
+              <NavButton
+                active={activeTab === 'profile'}
+                onClick={() => setActiveTab('profile')}
+                icon={<UserIcon className="w-6 h-6" />}
+                label="Profile"
+                data-tour="mobile-profile"
               />
             </nav>
           </div>
@@ -568,10 +581,11 @@ export default function App() {
   );
 }
 
-function NavButton({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string }) {
+function NavButton({ active, onClick, icon, label, 'data-tour': dataTour }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string; 'data-tour'?: string }) {
   return (
-    <button 
+    <button
       onClick={onClick}
+      data-tour={dataTour}
       className={`flex flex-col items-center gap-1 transition-all ${
         active ? 'text-[#1a365d]' : 'text-[#a0aec0] hover:text-[#718096]'
       }`}

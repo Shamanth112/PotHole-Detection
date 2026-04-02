@@ -54,7 +54,7 @@ export default function OnboardingTour({ userName }: OnboardingTourProps) {
       content: (
         <div className="text-left font-sans">
           <h2 className="text-lg font-bold mb-2 text-[#1a365d]">Dashboard</h2>
-          <p className="text-sm text-gray-600">Overview of your contributions and recent activity.</p>
+          <p className="text-sm text-gray-600">Overview of your contributions and recent activity. Start AI detection or create manual reports from here.</p>
         </div>
       ),
     },
@@ -63,7 +63,16 @@ export default function OnboardingTour({ userName }: OnboardingTourProps) {
       content: (
         <div className="text-left font-sans">
           <h2 className="text-lg font-bold mb-2 text-[#1a365d]">Live Map</h2>
-          <p className="text-sm text-gray-600">View potholes reported by you and others around you.</p>
+          <p className="text-sm text-gray-600">View potholes reported by you and others around you. See severity and status at a glance.</p>
+        </div>
+      ),
+    },
+    {
+      target: '[data-tour="history"]',
+      content: (
+        <div className="text-left font-sans">
+          <h2 className="text-lg font-bold mb-2 text-[#1a365d]">Report History</h2>
+          <p className="text-sm text-gray-600">Track all your submitted reports, view their current status, and delete any if needed.</p>
         </div>
       ),
     },
@@ -72,7 +81,16 @@ export default function OnboardingTour({ userName }: OnboardingTourProps) {
       content: (
         <div className="text-left font-sans">
           <h2 className="text-lg font-bold mb-2 text-[#1a365d]">AI Scanner</h2>
-          <p className="text-sm text-gray-600">Use your camera to automatically detect and report potholes.</p>
+          <p className="text-sm text-gray-600">Use your camera to automatically detect and report potholes in real-time.</p>
+        </div>
+      ),
+    },
+    {
+      target: '[data-tour="report"]',
+      content: (
+        <div className="text-left font-sans">
+          <h2 className="text-lg font-bold mb-2 text-[#1a365d]">Manual Report</h2>
+          <p className="text-sm text-gray-600">Manually report a pothole by taking a photo, confirming location, and setting severity level.</p>
         </div>
       ),
     },
@@ -81,7 +99,7 @@ export default function OnboardingTour({ userName }: OnboardingTourProps) {
       content: (
         <div className="text-left font-sans">
           <h2 className="text-lg font-bold mb-2 text-[#1a365d]">Your Profile</h2>
-          <p className="text-sm text-gray-600">Manage your settings and view your total points.</p>
+          <p className="text-sm text-gray-600">Manage your settings, view your points, and upload a custom profile photo.</p>
         </div>
       ),
     }
