@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import Joyride, { CallBackProps, STATUS, Step } from 'react-joyride';
+import { Joyride, CallBackProps, STATUS, Step } from 'react-joyride';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface OnboardingTourProps {
