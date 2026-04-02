@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Joyride, CallBackProps, STATUS, Step } from 'react-joyride';
+import { Joyride, EventData, STATUS, Step } from 'react-joyride';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface OnboardingTourProps {
@@ -27,7 +27,7 @@ export default function OnboardingTour({ userName }: OnboardingTourProps) {
     localStorage.setItem('hasSeenTour', 'true');
   };
 
-  const handleJoyrideCallback = (data: CallBackProps) => {
+  const handleJoyrideCallback = (data: EventData) => {
     const { status } = data;
     const finishedStatuses: string[] = [STATUS.FINISHED, STATUS.SKIPPED];
 
@@ -47,7 +47,7 @@ export default function OnboardingTour({ userName }: OnboardingTourProps) {
           <p className="text-sm text-gray-600">Let's take a quick tour to help you get started with the essential features.</p>
         </div>
       ),
-      disableBeacon: true,
+      skipBeacon: true,
     },
     {
       target: '[data-tour="dashboard"]',
@@ -153,22 +153,21 @@ export default function OnboardingTour({ userName }: OnboardingTourProps) {
         steps={steps}
         run={run}
         continuous
-        showProgress
-        showSkipButton
-        hideCloseButton
-        disableOverlayClose
-        callback={handleJoyrideCallback}
+        onEvent={handleJoyrideCallback}
+        options={{
+          primaryColor: '#1a365d',
+          textColor: '#1a365d',
+          backgroundColor: '#ffffff',
+          arrowColor: '#ffffff',
+          showProgress: true,
+          overlayClickAction: false,
+          buttons: ['back', 'primary', 'skip']
+        }}
         styles={{
-          options: {
-            primaryColor: '#1a365d',
-            textColor: '#1a365d',
-            backgroundColor: '#ffffff',
-            arrowColor: '#ffffff',
-          },
           tooltipContainer: {
             textAlign: 'left',
           },
-          buttonNext: {
+          buttonPrimary: {
             backgroundColor: '#1a365d',
             borderRadius: '8px',
             fontSize: '14px',
