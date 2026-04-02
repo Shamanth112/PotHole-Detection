@@ -10,6 +10,7 @@ import MapView from './components/MapView';
 import PotholeList from './components/PotholeList';
 import MunicipalDashboard from './components/MunicipalDashboard';
 import AdminDashboard from './components/AdminDashboard';
+import OnboardingTour from './components/OnboardingTour';
 import { usePotholes } from './hooks/usePotholes';
 import { uploadToConvex } from './services/storageService';
 import { 
@@ -257,6 +258,7 @@ export default function App() {
           </div>
         ) : (
           <div className="min-h-screen bg-[#f7fafc] flex font-sans relative overflow-hidden">
+            <OnboardingTour userName={user.name || 'Road Guardian'} />
             {/* Desktop Sidebar */}
             <aside className="hidden md:flex flex-col w-64 bg-[#1a365d] text-white p-6 sticky top-0 h-screen shadow-2xl z-50">
               <div className="flex items-center gap-3 mb-12">
@@ -272,12 +274,14 @@ export default function App() {
                   onClick={() => setActiveTab('home')} 
                   icon={<HomeIcon className="w-5 h-5" />} 
                   label="Dashboard" 
+                  data-tour="dashboard"
                 />
                 <SidebarButton 
                   active={activeTab === 'map'} 
                   onClick={() => setActiveTab('map')} 
                   icon={<MapIcon className="w-5 h-5" />} 
                   label="Live Map" 
+                  data-tour="map"
                 />
                 <SidebarButton 
                   active={activeTab === 'history'} 
@@ -290,12 +294,14 @@ export default function App() {
                   onClick={() => setActiveTab('scan')} 
                   icon={<Scan className="w-5 h-5" />} 
                   label="AI Scanner" 
+                  data-tour="scan"
                 />
                 <SidebarButton 
                   active={activeTab === 'profile'} 
                   onClick={() => setActiveTab('profile')} 
                   icon={<UserIcon className="w-5 h-5" />} 
                   label="My Profile" 
+                  data-tour="profile"
                 />
                 {user.role === 'admin' && (
                   <SidebarButton 
@@ -577,10 +583,11 @@ function NavButton({ active, onClick, icon, label }: { active: boolean; onClick:
   );
 }
 
-function SidebarButton({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string }) {
+function SidebarButton({ active, onClick, icon, label, 'data-tour': dataTour }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string; 'data-tour'?: string }) {
   return (
     <button 
       onClick={onClick}
+      data-tour={dataTour}
       className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all font-bold text-sm ${
         active ? 'bg-white text-[#1a365d] shadow-lg' : 'text-blue-100/70 hover:bg-white/5 hover:text-white'
       }`}
