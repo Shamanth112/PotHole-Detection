@@ -91,6 +91,9 @@ export default function CameraView({ onDetection, onBack, gpsActive, userLocatio
   const userLocationRef = useRef(userLocation);
   useEffect(() => { userLocationRef.current = userLocation; }, [userLocation]);
 
+  // Track latest captureAndReport to avoid stale closures in loop
+  const captureAndReportRef = useRef<((detection: Detection) => Promise<void>) | null>(null);
+
   // ── Initialization: start camera + load model in PARALLEL ──────────────────
   useEffect(() => {
     let cancelled = false;
@@ -217,7 +220,7 @@ export default function CameraView({ onDetection, onBack, gpsActive, userLocatio
               if (!tooClose) {
                 lastDetectionTime.current = t;
                 if (loc) lastReportLocations.current.push({ lat: loc.lat, lng: loc.lng });
-                captureAndReport(filtered[0]);
+                if (captureAndReportRef.current) captureAndReportRef.current(filtered[0]);
               }
             }
           }
@@ -229,9 +232,13 @@ export default function CameraView({ onDetection, onBack, gpsActive, userLocatio
     return () => cancelAnimationFrame(animFrameRef.current);
   }, [modelStatus, drawOverlay]); // userLocation is now read via ref — no restart on GPS updates
 
+
   // ── Capture + report ──────────────────────────────────────────────────────
+  useEffect(() => { captureAndReportRef.current = captureAndReport; });
+
   const captureAndReport = async (detection: Detection) => {
     if (!videoRef.current || isUploading) return;
+
 
     setIsUploading(true);
     setShowShutter(true);
