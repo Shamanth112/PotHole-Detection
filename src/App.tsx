@@ -153,21 +153,21 @@ export default function App() {
     }
   };
 
-  const handleDetection = (detection: any, imageUrl: string) => {
-    if (!userLocation) {
-      console.warn("[Auto-Report] No user location, skipping report");
-      return;
-    }
+  const handleDetection = (detection: any, imageUrl: string, storageId?: string) => {
+    // Use GPS if available, otherwise fall back to 0,0 so the report is still saved
+    const lat = userLocation?.lat ?? 0;
+    const lng = userLocation?.lng ?? 0;
 
-    console.log("[Auto-Report] Reporting pothole:", { lat: userLocation.lat, lng: userLocation.lng, score: detection.score });
+    console.log("[Auto-Report] Reporting pothole:", { lat, lng, score: detection.score, hasGPS: !!userLocation });
 
-    // Auto-report to municipal silently
+    // Auto-report silently
     handleReportPothole({
-      latitude: userLocation.lat,
-      longitude: userLocation.lng,
-      severity: detection.score > 0.8 ? 'high' : 'medium',
-      address: 'AI Detected - Road Focus Active',
-      reportImageUrl: imageUrl // we just store the generic url from the detector logic
+      latitude: lat,
+      longitude: lng,
+      severity: detection.score > 0.8 ? 'high' : detection.score > 0.5 ? 'medium' : 'low',
+      address: userLocation ? 'AI Detected - Road Scan' : 'AI Detected (GPS unavailable)',
+      reportImageUrl: imageUrl,
+      reportImageId: storageId,
     }, true);
   };
 

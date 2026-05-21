@@ -8,7 +8,7 @@ import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
 
 interface CameraViewProps {
-  onDetection: (detection: Detection, imageUrl: string) => void;
+  onDetection: (detection: Detection, imageUrl: string, storageId: string) => void;
   onBack: () => void;
   gpsActive: boolean;
   userLocation: { lat: number; lng: number } | null;
@@ -262,7 +262,7 @@ export default function CameraView({ onDetection, onBack, gpsActive, userLocatio
       const storageId = await uploadToConvex(convex, blob);
       const url = await convex.query(api.storage.getImageUrl, { storageId: storageId as Id<"_storage"> }) as string;
       
-      onDetection(detection, url);
+      onDetection(detection, url, storageId);
 
       const conf = Math.round(detection.score * 100);
       setSessionReports(prev => [{
