@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, FileText, Activity, CheckCircle2, ShieldAlert, Wifi, LayoutDashboard, ShieldCheck, ChevronRight, MapPin } from 'lucide-react';
+import { Play, FileText, Activity, CheckCircle2, ShieldAlert, Wifi, LayoutDashboard, ShieldCheck, ChevronRight, MapPin, TrendingUp, Zap, AlertTriangle, Clock } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 
@@ -7,117 +7,193 @@ interface HomeViewProps {
   userRole: 'citizen' | 'admin' | 'municipal' | null;
   onStartDetection: () => void;
   onReportManually: () => void;
-  stats: {
-    detectedToday: number;
-    fixedThisWeek: number;
-  };
+  stats: { detectedToday: number; fixedThisWeek: number; };
+  totalReports?: number;
+  userName?: string;
 }
 
-export default function HomeView({ userRole, onStartDetection, onReportManually, stats }: HomeViewProps) {
+export default function HomeView({ userRole, onStartDetection, onReportManually, stats, totalReports = 0, userName = 'Guardian' }: HomeViewProps) {
   const navigate = useNavigate();
+
+  const statCards = [
+    { label: 'Detected Today',  value: stats.detectedToday, icon: <AlertTriangle className="w-5 h-5" />, color: 'text-orange-400', bg: 'rgba(249,115,22,0.1)', border: 'rgba(249,115,22,0.2)', glow: '0 0 20px rgba(249,115,22,0.1)' },
+    { label: 'Fixed This Week', value: stats.fixedThisWeek, icon: <CheckCircle2  className="w-5 h-5" />, color: 'text-emerald-400', bg: 'rgba(16,185,129,0.1)',  border: 'rgba(16,185,129,0.2)',  glow: '0 0 20px rgba(16,185,129,0.1)' },
+    { label: 'Total Reports',   value: totalReports,         icon: <MapPin       className="w-5 h-5" />, color: 'text-blue-400',   bg: 'rgba(59,130,246,0.1)',  border: 'rgba(59,130,246,0.2)',  glow: '0 0 20px rgba(59,130,246,0.1)' },
+  ];
+
   return (
-    <div className="flex flex-col h-full bg-white">
-      {/* Header */}
-      <header className="bg-[#1a365d] text-white p-6 flex justify-between items-center shadow-lg">
-        <div className="flex items-center gap-2">
-          <ShieldAlert className="w-6 h-6" />
-          <h1 className="text-xl font-bold tracking-tight">RoadGuard</h1>
-        </div>
-        <div className="flex items-center gap-2 text-xs font-medium opacity-90">
-          <Wifi className="w-4 h-4 text-emerald-400" />
-          <span>GPS: Active</span>
-        </div>
-      </header>
+    <div className="min-h-full p-4 md:p-8 space-y-6 max-w-5xl mx-auto">
+      {/* ── Greeting ── */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+        <h1 className="text-3xl md:text-4xl font-black tracking-tight">
+          Good {getGreeting()}, <br className="md:hidden" />
+          <span className="gradient-text-blue">{userName.split(' ')[0]}</span> 👋
+        </h1>
+        <p className="text-sm mt-2" style={{ color: 'var(--text-secondary)' }}>
+          Your city's road health dashboard — real-time AI monitoring
+        </p>
+      </motion.div>
 
-      {/* Main Content */}
-      <div className="flex-1 p-6 md:p-12 flex flex-col items-center overflow-y-auto">
-        <div className="w-full max-w-4xl flex flex-col gap-8">
-          {/* Action Buttons */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <button 
-              onClick={onStartDetection}
-              className="group relative overflow-hidden bg-[#1a365d] text-white py-6 rounded-3xl font-black text-lg flex items-center justify-center gap-4 shadow-2xl hover:bg-[#152a4a] transition-all active:scale-95"
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-400/0 via-white/10 to-blue-400/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
-              <Play className="w-6 h-6 fill-current" />
-              <span className="tracking-tighter uppercase italic">Start AI Detection</span>
-            </button>
-            
-            <button 
-              onClick={onReportManually}
-              className="bg-white text-[#1a365d] border-4 border-[#1a365d] py-6 rounded-3xl font-black text-lg flex items-center justify-center gap-4 hover:bg-[#f7fafc] transition-all active:scale-95 shadow-xl"
-            >
-              <FileText className="w-6 h-6" />
-              <span className="tracking-tighter uppercase italic">Manual Report</span>
-            </button>
-          </div>
+      {/* ── Stat Cards ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {statCards.map(({ label, value, icon, color, bg, border, glow }, i) => (
+          <motion.div
+            key={label}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.1, duration: 0.4 }}
+            className="stat-card"
+            style={{ boxShadow: glow }}
+          >
+            {/* Background decoration */}
+            <div className="absolute -top-4 -right-4 w-20 h-20 rounded-full opacity-10" style={{ background: `radial-gradient(circle, ${bg.replace('0.1', '1')}, transparent)` }} />
 
-            {/* Stats Grid */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-[#ebf8ff] p-8 rounded-[2rem] border-2 border-blue-100 flex flex-col items-center justify-center text-center shadow-sm hover:shadow-md transition-shadow">
-                <p className="text-5xl font-black text-[#2b6cb0] mb-2 tracking-tighter">{stats.detectedToday}</p>
-                <p className="text-[10px] font-black text-[#4a5568] uppercase tracking-[0.2em]">Detected Today</p>
-              </div>
-              <div className="bg-[#f0fff4] p-8 rounded-[2rem] border-2 border-green-100 flex flex-col items-center justify-center text-center shadow-sm hover:shadow-md transition-shadow">
-                <p className="text-5xl font-black text-[#2f855a] mb-2 tracking-tighter">{stats.fixedThisWeek}</p>
-                <p className="text-[10px] font-black text-[#4a5568] uppercase tracking-[0.2em]">Fixed This Week</p>
-              </div>
-            </div>
-
-            {/* Quick Tips */}
-            {(userRole === 'municipal' || userRole === 'admin') && (
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="bg-blue-600 p-6 rounded-3xl border border-blue-500 shadow-xl text-white flex flex-col gap-4"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-                      <LayoutDashboard className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <p className="font-black text-sm uppercase italic tracking-tighter">Management Mode</p>
-                      <p className="text-[10px] font-bold text-blue-100/70 uppercase tracking-widest">Authorized Access</p>
-                    </div>
-                  </div>
-                  <ShieldCheck className="w-6 h-6 text-emerald-400" />
-                </div>
-                
-                <p className="text-xs text-blue-50/80 leading-relaxed font-medium">
-                  You have access to the municipal monitoring system. Track reports, update status, and manage road safety.
-                </p>
-
-                <div className="flex flex-col gap-2 pt-2">
-                  <button 
-                    onClick={() => navigate('/municipal')}
-                    className="w-full bg-white text-blue-600 py-3 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-blue-50 transition-all"
-                  >
-                    Open Municipal IDP <ChevronRight className="w-4 h-4" />
-                  </button>
-                  {userRole === 'admin' && (
-                    <button 
-                      onClick={() => navigate('/admin')}
-                      className="w-full bg-blue-700 text-white py-3 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-blue-800 transition-all border border-blue-500/50"
-                    >
-                      Admin Console <ChevronRight className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-              </motion.div>
-            )}
-
-            <div className="bg-zinc-50 p-6 rounded-3xl border border-zinc-200 flex items-start gap-4">
-              <div className="w-10 h-10 bg-white rounded-xl border border-zinc-200 flex items-center justify-center shrink-0">
-                <Activity className="w-5 h-5 text-[#1a365d]" />
-              </div>
+            <div className="flex items-start justify-between relative z-10">
               <div>
-                <p className="font-bold text-zinc-900 text-sm">Pro Tip</p>
-                <p className="text-xs text-zinc-500 leading-relaxed">Mount your device securely on the dashboard for the most accurate AI detection while driving.</p>
+                <p className="text-[11px] font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--text-muted)' }}>{label}</p>
+                <motion.p
+                  className={`text-4xl font-black ${color}`}
+                  initial={{ opacity: 0, scale: 0.5 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: i * 0.1 + 0.2, type: 'spring', stiffness: 200 }}
+                >
+                  {value}
+                </motion.p>
+              </div>
+              <div className="p-2.5 rounded-xl" style={{ background: bg, border: `1px solid ${border}` }}>
+                <div className={color}>{icon}</div>
               </div>
             </div>
-        </div>
+            <div className="mt-4 flex items-center gap-1.5 text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+              <TrendingUp className="w-3 h-3" />
+              <span>Live data</span>
+            </div>
+          </motion.div>
+        ))}
       </div>
+
+      {/* ── Action Buttons ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <motion.button
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.3 }}
+          onClick={onStartDetection}
+          className="group relative overflow-hidden rounded-2xl p-6 text-left transition-all hover:scale-[1.02] active:scale-[0.98]"
+          style={{ background: 'linear-gradient(135deg, #1d4ed8 0%, #0284c7 100%)', boxShadow: '0 8px 32px rgba(59,130,246,0.3)' }}
+        >
+          {/* Shine sweep */}
+          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+            style={{ background: 'linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.1) 50%, transparent 60%)', transform: 'translateX(-100%)', animation: 'none' }} />
+          <div className="absolute inset-0 group-hover:translate-x-full transition-transform duration-700"
+            style={{ background: 'linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.08) 50%, transparent 60%)' }} />
+
+          <div className="relative z-10">
+            <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center mb-4">
+              <Zap className="w-6 h-6 text-white" />
+            </div>
+            <h3 className="text-lg font-black text-white uppercase tracking-tight">Start AI Detection</h3>
+            <p className="text-sm text-blue-100/70 mt-1">Real-time pothole scanning via camera</p>
+          </div>
+          <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+            <ChevronRight className="w-5 h-5 text-white/50" />
+          </div>
+        </motion.button>
+
+        <motion.button
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.35 }}
+          onClick={onReportManually}
+          className="group relative overflow-hidden glass-hover rounded-2xl p-6 text-left transition-all hover:scale-[1.02] active:scale-[0.98]"
+          style={{ border: '1px solid rgba(255,255,255,0.1)' }}
+        >
+          <div className="relative z-10">
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4" style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)' }}>
+              <FileText className="w-6 h-6" style={{ color: 'var(--text-secondary)' }} />
+            </div>
+            <h3 className="text-lg font-black uppercase tracking-tight">Manual Report</h3>
+            <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>Manually submit a pothole with location & photo</p>
+          </div>
+          <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+            <ChevronRight className="w-5 h-5" style={{ color: 'var(--text-muted)' }} />
+          </div>
+        </motion.button>
+      </div>
+
+      {/* ── Admin / Municipal Panel ── */}
+      {(userRole === 'municipal' || userRole === 'admin') && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="rounded-2xl overflow-hidden"
+          style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.12), rgba(6,182,212,0.08))', border: '1px solid rgba(16,185,129,0.2)' }}
+        >
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl gradient-emerald flex items-center justify-center">
+                  <ShieldCheck className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <p className="font-bold text-emerald-400 text-sm">Management Access</p>
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Authorized {userRole} account</p>
+                </div>
+              </div>
+              <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest text-emerald-400" style={{ background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.25)' }}>
+                Active
+              </span>
+            </div>
+            <p className="text-sm mb-4 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+              You have access to the municipal monitoring system. Track reports, update status, and manage road safety across the city.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <button
+                onClick={() => navigate('/municipal')}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-emerald-400 transition-all hover:bg-emerald-500/20"
+                style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)' }}
+              >
+                Open Municipal Dashboard <ChevronRight className="w-4 h-4" />
+              </button>
+              {userRole === 'admin' && (
+                <button
+                  onClick={() => navigate('/admin')}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all"
+                  style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)', color: '#a78bfa' }}
+                >
+                  Admin Console <ChevronRight className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* ── Pro Tip ── */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.5 }}
+        className="glass rounded-2xl p-5 flex items-start gap-4"
+      >
+        <div className="w-10 h-10 rounded-xl shrink-0 flex items-center justify-center" style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)' }}>
+          <Activity className="w-5 h-5 text-blue-400" />
+        </div>
+        <div>
+          <p className="font-semibold text-sm text-blue-400 mb-1">Pro Tip</p>
+          <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+            Mount your device securely on the dashboard for the most accurate AI detection while driving. Enable GPS for precise location tagging.
+          </p>
+        </div>
+      </motion.div>
     </div>
   );
+}
+
+function getGreeting() {
+  const h = new Date().getHours();
+  if (h < 12) return 'Morning';
+  if (h < 17) return 'Afternoon';
+  return 'Evening';
 }

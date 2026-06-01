@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Pothole } from '../hooks/usePotholes';
-import { MapPin, Clock, ChevronRight, AlertTriangle, Info, Trash2, Loader2 } from 'lucide-react';
+import { MapPin, Clock, ChevronRight, AlertTriangle, Info, Trash2, Loader2, Filter, Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
@@ -14,172 +14,195 @@ interface PotholeListProps {
 export default function PotholeList({ potholes }: PotholeListProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [localPotholes, setLocalPotholes] = useState<Pothole[] | null>(null);
-  const [viewingImage, setViewingImage] = useState<{url: string, title: string} | null>(null);
+  const [viewingImage, setViewingImage] = useState<{ url: string; title: string } | null>(null);
+  const [filter, setFilter] = useState<'all' | 'high' | 'medium' | 'low'>('all');
+  const [search, setSearch] = useState('');
 
   const deletePotholeMutation = useMutation(api.potholes.deletePothole);
-
   const displayPotholes = localPotholes ?? potholes;
 
+  const filtered = displayPotholes
+    .filter(p => filter === 'all' || p.severity === filter)
+    .filter(p => !search || (p.address || '').toLowerCase().includes(search.toLowerCase()));
+
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this report? This cannot be undone.')) return;
+    if (!window.confirm('Delete this report? This cannot be undone.')) return;
     setDeletingId(id);
     try {
       await deletePotholeMutation({ potholeId: id as Id<"potholes"> });
-      // Optimistically remove from local list
       setLocalPotholes((prev) => (prev ?? potholes).filter((p) => p._id !== id));
     } catch (err: any) {
       alert('Failed to delete: ' + err.message);
-    } finally {
-      setDeletingId(null);
-    }
+    } finally { setDeletingId(null); }
   };
 
-  // Sync local list when prop changes (e.g. real-time update)
-  React.useEffect(() => {
-    setLocalPotholes(null);
-  }, [potholes]);
+  React.useEffect(() => { setLocalPotholes(null); }, [potholes]);
+
+  const statusConfig: Record<string, { label: string; class: string }> = {
+    reported: { label: 'Reported', class: 'badge-reported' },
+    verified: { label: 'Verified', class: 'badge-verified' },
+    fixing:   { label: 'Fixing',   class: 'badge-fixing'   },
+    resolved: { label: 'Resolved', class: 'badge-resolved' },
+  };
+
+  const statusProgress: Record<string, number> = {
+    reported: 10, verified: 33, fixing: 66, resolved: 100,
+  };
+
+  const severityConfig: Record<string, { class: string; bar: string }> = {
+    high:   { class: 'badge-high',   bar: '#ef4444' },
+    medium: { class: 'badge-medium', bar: '#f97316' },
+    low:    { class: 'badge-low',    bar: '#eab308' },
+  };
 
   return (
-    <div className="flex flex-col h-full bg-white">
-      {/* Header */}
-      <header className="bg-[#1a365d] text-white p-6 shadow-lg z-10">
-        <h1 className="text-xl font-bold tracking-tight">Report History</h1>
-      </header>
-
-      {/* List */}
-      <div className="flex-1 overflow-y-auto p-4 md:p-8">
-        {displayPotholes.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-[#a0aec0] py-24">
-            <MapPin className="w-16 h-16 mb-6 opacity-20" />
-            <p className="font-black text-xl italic uppercase tracking-tighter">No reports found</p>
-            <p className="text-sm mt-2">Your reported potholes will appear here</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-            <AnimatePresence>
-              {displayPotholes.map((p) => (
-                <motion.div
-                  key={p._id}
-                  layout
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                  className="bg-white rounded-3xl border-2 border-[#e2e8f0] p-6 shadow-sm hover:shadow-xl hover:border-[#1a365d]/20 transition-all flex flex-col gap-6 group relative overflow-hidden"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shrink-0 shadow-inner ${
-                      p.severity === 'high' ? 'bg-red-50 text-red-600' : 
-                      p.severity === 'medium' ? 'bg-orange-50 text-orange-600' : 'bg-yellow-50 text-yellow-600'
-                    }`}>
-                      {p.severity === 'high' ? <AlertTriangle className="w-8 h-8" /> : 
-                       p.severity === 'medium' ? <Info className="w-8 h-8" /> : <MapPin className="w-8 h-8" />}
-                    </div>
-                    
-                    <div className="flex flex-col items-end gap-2">
-                      <span className={`text-[10px] font-black uppercase px-3 py-1 rounded-full tracking-widest ${
-                        p.severity === 'high' ? 'bg-red-600 text-white' : 
-                        p.severity === 'medium' ? 'bg-orange-600 text-white' : 'bg-yellow-600 text-white'
-                      }`}>
-                        {p.severity}
-                      </span>
-                      <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#a0aec0] uppercase tracking-widest">
-                        <Clock className="w-3 h-3" />
-                        <span>{new Date(p._creationTime).toLocaleDateString()}</span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <h3 className="font-black text-[#1a365d] text-lg leading-tight tracking-tighter italic uppercase">
-                      {p.address || `Pothole at ${p.latitude.toFixed(4)}, ${p.longitude.toFixed(4)}`}
-                    </h3>
-                    <p className="text-xs text-[#718096] font-medium">Reported by {p.userName || 'Anonymous'}</p>
-                    
-                    <div className="flex gap-2 mt-2 overflow-x-auto pb-2">
-                      {p.reportImageUrl && (
-                        <div className="shrink-0 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setViewingImage({url: p.reportImageUrl!, title: 'Report Photo'})}>
-                          <p className="text-[8px] font-black text-[#a0aec0] uppercase tracking-widest mb-1">Report</p>
-                          <img src={p.reportImageUrl} className="w-20 h-20 object-cover rounded-xl border border-[#e2e8f0]" alt="Report" referrerPolicy="no-referrer" />
-                        </div>
-                      )}
-                      {p.resolvedImageUrl && (
-                        <div className="shrink-0 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setViewingImage({url: p.resolvedImageUrl!, title: 'Resolved Photo'})}>
-                          <p className="text-[8px] font-black text-emerald-500 uppercase tracking-widest mb-1">Resolved</p>
-                          <img src={p.resolvedImageUrl} className="w-20 h-20 object-cover rounded-xl border border-emerald-500/30" alt="Resolved" referrerPolicy="no-referrer" />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest">
-                      <div className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full animate-pulse ${
-                          p.status === 'resolved' ? 'bg-emerald-500' : 
-                          p.status === 'fixing' ? 'bg-blue-500' : 
-                          p.status === 'verified' ? 'bg-purple-500' : 'bg-zinc-400'
-                        }`} />
-                        <span className={
-                          p.status === 'resolved' ? 'text-emerald-600' : 
-                          p.status === 'fixing' ? 'text-blue-600' : 
-                          p.status === 'verified' ? 'text-purple-600' : 'text-zinc-500'
-                        }>{p.status}</span>
-                      </div>
-                      <span className="text-[#a0aec0]">
-                        {p.status === 'resolved' ? '100%' : 
-                         p.status === 'fixing' ? '66%' : 
-                         p.status === 'verified' ? '33%' : '10%'}
-                      </span>
-                    </div>
-                    
-                    <div className="h-2 w-full bg-[#edf2f7] rounded-full overflow-hidden shadow-inner">
-                      <motion.div 
-                        initial={{ width: 0 }}
-                        animate={{ 
-                          width: p.status === 'resolved' ? '100%' : 
-                                 p.status === 'fixing' ? '66%' : 
-                                 p.status === 'verified' ? '33%' : '10%' 
-                        }}
-                        className={`h-full transition-all duration-1000 ${
-                          p.status === 'resolved' ? 'bg-emerald-500' : 
-                          p.status === 'fixing' ? 'bg-blue-500' : 
-                          p.status === 'verified' ? 'bg-purple-500' : 'bg-zinc-400'
-                        }`}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Delete Button */}
-                  <button
-                    onClick={() => handleDelete(p._id)}
-                    disabled={deletingId === p._id}
-                    className="w-full mt-2 flex items-center justify-center gap-2 py-2.5 rounded-2xl border-2 border-red-100 text-red-500 hover:bg-red-50 hover:border-red-200 transition-all text-xs font-black uppercase tracking-widest disabled:opacity-50"
-                  >
-                    {deletingId === p._id ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="w-4 h-4" />
-                    )}
-                    {deletingId === p._id ? 'Deleting...' : 'Delete Report'}
-                  </button>
-
-                  <div className="absolute bottom-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <div className="w-10 h-10 bg-[#1a365d] text-white rounded-xl flex items-center justify-center shadow-lg">
-                      <ChevronRight className="w-5 h-5" />
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </div>
-        )}
+    <div className="min-h-full p-4 md:p-8 max-w-6xl mx-auto space-y-6">
+      {/* ── Header ── */}
+      <div>
+        <h1 className="text-2xl md:text-3xl font-black tracking-tight">Report <span className="gradient-text-blue">History</span></h1>
+        <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>{potholes.length} total reports in your area</p>
       </div>
 
-      <ImageViewer 
-        url={viewingImage?.url || null} 
-        title={viewingImage?.title} 
-        onClose={() => setViewingImage(null)} 
-      />
+      {/* ── Filters ── */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        {/* Search */}
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by location..."
+            className="input-dark pl-10"
+          />
+        </div>
+        {/* Severity filter */}
+        <div className="flex gap-2">
+          {(['all', 'high', 'medium', 'low'] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className="px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all"
+              style={{
+                background: filter === f ? 'rgba(59,130,246,0.2)' : 'rgba(255,255,255,0.04)',
+                border: `1px solid ${filter === f ? 'rgba(59,130,246,0.4)' : 'var(--border)'}`,
+                color: filter === f ? '#60a5fa' : 'var(--text-secondary)',
+              }}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Empty state ── */}
+      {filtered.length === 0 && (
+        <div className="glass rounded-3xl p-16 text-center">
+          <div className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)' }}>
+            <MapPin className="w-8 h-8" style={{ color: 'var(--text-muted)' }} />
+          </div>
+          <p className="text-lg font-bold">No reports found</p>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Try adjusting your filters or report a new pothole</p>
+        </div>
+      )}
+
+      {/* ── Cards grid ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+        <AnimatePresence>
+          {filtered.map((p, i) => {
+            const sev = severityConfig[p.severity] || severityConfig.low;
+            const st = statusConfig[p.status] || statusConfig.reported;
+            const progress = statusProgress[p.status] ?? 10;
+
+            return (
+              <motion.div
+                key={p._id}
+                layout
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                transition={{ delay: i * 0.04 }}
+                className="glass-hover rounded-2xl p-5 flex flex-col gap-4 relative overflow-hidden group"
+              >
+                {/* Severity glow strip */}
+                <div className="absolute top-0 left-0 right-0 h-0.5" style={{ background: p.severity === 'high' ? 'linear-gradient(90deg, #ef4444, transparent)' : p.severity === 'medium' ? 'linear-gradient(90deg, #f97316, transparent)' : 'linear-gradient(90deg, #eab308, transparent)' }} />
+
+                {/* Top row */}
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className={`${sev.class} px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest`}>
+                      {p.severity}
+                    </span>
+                    <span className={`${st.class} px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest`}>
+                      {st.label}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>
+                    <Clock className="w-3 h-3" />
+                    {new Date(p._creationTime).toLocaleDateString()}
+                  </div>
+                </div>
+
+                {/* Address */}
+                <div>
+                  <h3 className="font-bold text-sm leading-snug line-clamp-2">
+                    {p.address || `${p.latitude.toFixed(4)}, ${p.longitude.toFixed(4)}`}
+                  </h3>
+                  <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>by {p.userName || 'Anonymous'}</p>
+                </div>
+
+                {/* Images */}
+                {(p.reportImageUrl || p.resolvedImageUrl) && (
+                  <div className="flex gap-2 overflow-x-auto no-scrollbar">
+                    {p.reportImageUrl && (
+                      <div className="shrink-0 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setViewingImage({ url: p.reportImageUrl!, title: 'Report Photo' })}>
+                        <p className="text-[9px] font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--text-muted)' }}>Report</p>
+                        <img src={p.reportImageUrl} className="w-20 h-20 object-cover rounded-xl" style={{ border: '1px solid var(--border)' }} alt="Report" referrerPolicy="no-referrer" />
+                      </div>
+                    )}
+                    {p.resolvedImageUrl && (
+                      <div className="shrink-0 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setViewingImage({ url: p.resolvedImageUrl!, title: 'Resolved Photo' })}>
+                        <p className="text-[9px] font-bold uppercase tracking-widest mb-1 text-emerald-400">Resolved</p>
+                        <img src={p.resolvedImageUrl} className="w-20 h-20 object-cover rounded-xl border border-emerald-500/30" alt="Resolved" referrerPolicy="no-referrer" />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Progress bar */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>Resolution Progress</span>
+                    <span className="text-[10px] font-bold" style={{ color: 'var(--text-secondary)' }}>{progress}%</span>
+                  </div>
+                  <div className="progress-bar">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${progress}%` }}
+                      transition={{ delay: i * 0.04 + 0.3, duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+                      className="progress-fill"
+                      style={{ background: p.status === 'resolved' ? '#10b981' : p.status === 'fixing' ? '#3b82f6' : p.status === 'verified' ? '#8b5cf6' : '#64748b' }}
+                    />
+                  </div>
+                </div>
+
+                {/* Delete button */}
+                <button
+                  onClick={() => handleDelete(p._id)}
+                  disabled={deletingId === p._id}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold transition-all hover:bg-red-500/10 disabled:opacity-50"
+                  style={{ border: '1px solid rgba(239,68,68,0.15)', color: '#f87171' }}
+                >
+                  {deletingId === p._id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                  {deletingId === p._id ? 'Deleting...' : 'Delete Report'}
+                </button>
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
+      </div>
+
+      <ImageViewer url={viewingImage?.url || null} title={viewingImage?.title} onClose={() => setViewingImage(null)} />
     </div>
   );
 }

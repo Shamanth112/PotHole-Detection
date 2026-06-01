@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Upload, MapPin, CheckCircle2, AlertTriangle, Info, ArrowLeft, Loader2, Camera, X } from 'lucide-react';
+import React, { useState } from 'react';
+import { Upload, MapPin, CheckCircle2, AlertTriangle, Info, ArrowLeft, Loader2, X } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useConvex } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { uploadToConvex } from '../services/storageService';
 import { Id } from '@/convex/_generated/dataModel';
+import { useEffect, useRef } from 'react';
 
 interface ReportViewProps {
   onBack: () => void;
@@ -25,235 +26,185 @@ export default function ReportView({ onBack, onSubmit, userId }: ReportViewProps
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      const url = URL.createObjectURL(file);
-      setPreviewUrl(url);
-    }
+    if (file) { setSelectedFile(file); setPreviewUrl(URL.createObjectURL(file)); }
   };
 
   const clearSelection = () => {
-    setSelectedFile(null);
-    setPreviewUrl(null);
+    setSelectedFile(null); setPreviewUrl(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   useEffect(() => {
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-            address: 'Auto-detected location'
-          });
-          setIsLocating(false);
-        },
-        (error) => {
-          console.error("Error getting location:", error);
-          // Fallback to default if denied
-          setLocation({
-            lat: 40.7128,
-            lng: -74.0060,
-            address: 'Default Location (GPS Disabled)'
-          });
-          setIsLocating(false);
-        }
+        (pos) => { setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude, address: 'Auto-detected location' }); setIsLocating(false); },
+        () => { setLocation({ lat: 40.7128, lng: -74.0060, address: 'Default Location (GPS Disabled)' }); setIsLocating(false); }
       );
-    } else {
-      setIsLocating(false);
-    }
+    } else { setIsLocating(false); }
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedFile) {
-      alert("Please upload a photo of the pothole.");
-      return;
-    }
-    
+    if (!selectedFile) { alert("Please upload a photo of the pothole."); return; }
     setIsSubmitting(true);
-    
     try {
       let reportImageId: string | undefined;
       let reportImageUrl: string | undefined;
-      
       try {
         reportImageId = await uploadToConvex(convex, selectedFile);
-        // resolve to URL so we have it for older views / map markers
         reportImageUrl = await convex.query(api.storage.getImageUrl, { storageId: reportImageId as Id<"_storage"> }) as string;
       } catch (uploadError: any) {
-        console.error("Upload error:", uploadError);
         throw new Error(`Photo upload failed: ${uploadError.message || 'Check storage permissions'}`);
       }
-
-      onSubmit({ 
-        severity, 
-        notes,
-        latitude: location?.lat || 40.7128,
-        longitude: location?.lng || -74.0060,
-        address: location?.address || 'Unknown Location',
-        reportImageId,
-        reportImageUrl
-      });
+      onSubmit({ severity, notes, latitude: location?.lat || 40.7128, longitude: location?.lng || -74.0060, address: location?.address || 'Unknown Location', reportImageId, reportImageUrl });
     } catch (error: any) {
-      console.error("Error submitting report:", error);
-      alert(error.message || "Failed to submit report. Please try again.");
-    } finally {
-      setIsSubmitting(false);
-    }
+      alert(error.message || "Failed to submit report.");
+    } finally { setIsSubmitting(false); }
   };
 
+  const severityOptions = [
+    { level: 'low',    label: 'Low Severity',    desc: 'Minor damage, safe to drive',        icon: <Info className="w-5 h-5" />,          color: 'text-yellow-400', bg: 'rgba(234,179,8,0.08)',   border: 'rgba(234,179,8,0.3)',   selectedBorder: 'rgba(234,179,8,0.6)'   },
+    { level: 'medium', label: 'Medium Severity', desc: 'Noticeable damage, caution advised',  icon: <AlertTriangle className="w-5 h-5" />,  color: 'text-orange-400', bg: 'rgba(249,115,22,0.08)',  border: 'rgba(249,115,22,0.2)',  selectedBorder: 'rgba(249,115,22,0.6)'  },
+    { level: 'high',   label: 'High Severity',   desc: 'Severe damage, avoid if possible',   icon: <AlertTriangle className="w-5 h-5" />,  color: 'text-red-400',    bg: 'rgba(239,68,68,0.08)',   border: 'rgba(239,68,68,0.2)',   selectedBorder: 'rgba(239,68,68,0.6)'   },
+  ];
+
   return (
-    <div className="flex flex-col h-full bg-white">
-      {/* Header */}
-      <header className="bg-[#1a365d] text-white p-6 flex items-center gap-4 shadow-lg">
-        <button onClick={onBack} className="p-1 hover:bg-white/10 rounded-full transition-colors">
-          <ArrowLeft className="w-6 h-6" />
+    <div className="min-h-full p-4 md:p-8 max-w-2xl mx-auto space-y-6">
+      {/* ── Header ── */}
+      <div className="flex items-center gap-4">
+        <button onClick={onBack} className="w-10 h-10 rounded-xl glass flex items-center justify-center transition-all hover:bg-white/10" style={{ color: 'var(--text-secondary)' }}>
+          <ArrowLeft className="w-5 h-5" />
         </button>
-        <h1 className="text-xl font-bold tracking-tight">Report Pothole</h1>
-      </header>
-
-      {/* Form */}
-      <form onSubmit={handleSubmit} className="flex-1 p-6 flex flex-col gap-8 overflow-y-auto">
-        {/* Photo Evidence */}
-        <section>
-          <h3 className="text-sm font-bold text-[#4a5568] mb-4 uppercase tracking-wider">Photo Evidence</h3>
-          {!previewUrl ? (
-            <div 
-              onClick={() => fileInputRef.current?.click()}
-              className="aspect-video border-2 border-dashed border-[#cbd5e0] rounded-2xl flex flex-col items-center justify-center gap-4 bg-[#f7fafc] hover:bg-[#edf2f7] transition-all cursor-pointer"
-            >
-              <Camera className="w-12 h-12 text-[#a0aec0]" />
-              <div className="text-center">
-                <p className="font-bold text-[#4a5568]">Tap to take photo</p>
-                <p className="text-xs text-[#718096]">or upload from gallery</p>
-              </div>
-            </div>
-          ) : (
-            <div className="relative aspect-video rounded-2xl overflow-hidden border-2 border-[#1a365d] shadow-lg">
-              <img src={previewUrl} className="w-full h-full object-cover" alt="Preview" />
-              <button 
-                type="button"
-                onClick={clearSelection}
-                className="absolute top-4 right-4 p-2 bg-black/60 rounded-full text-white hover:bg-black/80"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-          )}
-          <input 
-            type="file" 
-            ref={fileInputRef}
-            onChange={handleFileChange}
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-          />
-        </section>
-
-        {/* Location */}
-        <section>
-          <h3 className="text-sm font-bold text-[#4a5568] mb-4 uppercase tracking-wider">Location</h3>
-          <div className="p-5 bg-white border border-[#e2e8f0] rounded-2xl flex items-center gap-4 shadow-sm relative overflow-hidden group">
-            <div className="w-12 h-12 bg-[#ebf8ff] rounded-xl flex items-center justify-center shrink-0">
-              {isLocating ? (
-                <Loader2 className="w-6 h-6 text-[#3182ce] animate-spin" />
-              ) : (
-                <MapPin className="w-6 h-6 text-[#3182ce]" />
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-bold text-[#2d3748] text-sm">
-                {isLocating ? 'Detecting Location...' : 'Auto-detected (GPS)'}
-              </p>
-              <p className="text-xs text-[#718096] truncate">
-                {location?.address || 'Waiting for GPS...'}
-              </p>
-              {location && (
-                <p className="text-[10px] text-[#a0aec0] font-mono">
-                  {location.lat.toFixed(4)}° N, {location.lng.toFixed(4)}° W
-                </p>
-              )}
-            </div>
-            {!isLocating && <CheckCircle2 className="w-6 h-6 text-[#48bb78] shrink-0" />}
-          </div>
-        </section>
-
-        {/* Severity Level */}
-        <section>
-          <h3 className="text-sm font-bold text-[#4a5568] mb-4 uppercase tracking-wider">Severity Level</h3>
-          <div className="flex flex-col gap-3">
-            <SeverityCard 
-              level="low" 
-              label="Low" 
-              description="Minor damage, safe to drive" 
-              selected={severity === 'low'} 
-              onClick={() => setSeverity('low')} 
-            />
-            <SeverityCard 
-              level="medium" 
-              label="Medium" 
-              description="Noticeable damage, caution advised" 
-              selected={severity === 'medium'} 
-              onClick={() => setSeverity('medium')} 
-            />
-            <SeverityCard 
-              level="high" 
-              label="High" 
-              description="Severe damage, avoid if possible" 
-              selected={severity === 'high'} 
-              onClick={() => setSeverity('high')} 
-            />
-          </div>
-        </section>
-
-        {/* Additional Notes */}
-        <section>
-          <h3 className="text-sm font-bold text-[#4a5568] mb-4 uppercase tracking-wider">Additional Notes (Optional)</h3>
-          <textarea 
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            className="w-full p-4 bg-white border border-[#e2e8f0] rounded-2xl text-sm focus:ring-2 focus:ring-[#3182ce] outline-none transition-all min-h-[120px]"
-            placeholder="Add any additional details..."
-          />
-        </section>
-
-        {/* Submit Button */}
-        <div className="mt-auto pt-6 flex flex-col gap-4">
-          <button 
-            type="submit"
-            disabled={isSubmitting}
-            className={`w-full py-4 rounded-xl font-bold text-white shadow-lg transition-all active:scale-95 flex items-center justify-center gap-3 ${
-              isSubmitting ? 'bg-[#a0aec0]' : 'bg-[#1a365d] hover:bg-[#152a4a]'
-            }`}
-          >
-            {isSubmitting ? 'Submitting...' : 'Submit Report'}
-          </button>
-          <p className="text-center text-xs text-[#718096]">Please upload a photo to continue</p>
+        <div>
+          <h1 className="text-2xl font-black tracking-tight">Report <span className="gradient-text-blue">Pothole</span></h1>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Help improve road safety in your city</p>
         </div>
-      </form>
-    </div>
-  );
-}
+      </div>
 
-function SeverityCard({ level, label, description, selected, onClick }: { level: string; label: string; description: string; selected: boolean; onClick: () => void }) {
-  return (
-    <div 
-      onClick={onClick}
-      className={`p-5 rounded-2xl border-2 transition-all cursor-pointer flex items-center justify-between ${
-        selected ? 'border-[#1a365d] bg-[#ebf8ff]' : 'border-[#e2e8f0] bg-white hover:border-[#cbd5e0]'
-      }`}
-    >
-      <div className="flex flex-col gap-1">
-        <p className="font-bold text-[#2d3748]">{label}</p>
-        <p className="text-xs text-[#718096]">{description}</p>
-      </div>
-      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
-        selected ? 'border-[#1a365d]' : 'border-[#cbd5e0]'
-      }`}>
-        {selected && <div className="w-3 h-3 bg-[#1a365d] rounded-full" />}
-      </div>
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* ── Photo Upload ── */}
+        <div className="glass rounded-2xl overflow-hidden">
+          <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--border)' }}>
+            <h3 className="text-sm font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>📸 Photo Evidence</h3>
+          </div>
+          <div className="p-4">
+            {!previewUrl ? (
+              <motion.div
+                whileHover={{ scale: 1.01 }}
+                onClick={() => fileInputRef.current?.click()}
+                className="rounded-2xl flex flex-col items-center justify-center gap-3 cursor-pointer transition-all py-12"
+                style={{ border: '2px dashed rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.04)' }}
+              >
+                <div className="w-14 h-14 rounded-2xl gradient-blue flex items-center justify-center glow-blue">
+                  <Upload className="w-7 h-7 text-white" />
+                </div>
+                <div className="text-center">
+                  <p className="font-bold text-blue-400">Tap to take photo</p>
+                  <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>or upload from gallery • JPG, PNG, WEBP</p>
+                </div>
+              </motion.div>
+            ) : (
+              <div className="relative rounded-2xl overflow-hidden" style={{ aspectRatio: '16/9' }}>
+                <img src={previewUrl} className="w-full h-full object-cover" alt="Preview" />
+                <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.4), transparent)' }} />
+                <button type="button" onClick={clearSelection} className="absolute top-3 right-3 p-2 rounded-xl bg-black/60 backdrop-blur-sm text-white hover:bg-black/80 transition-all">
+                  <X className="w-4 h-4" />
+                </button>
+                <div className="absolute bottom-3 left-3 flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                  <span className="text-xs font-semibold text-white">Photo ready</span>
+                </div>
+              </div>
+            )}
+            <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" capture="environment" className="hidden" />
+          </div>
+        </div>
+
+        {/* ── Location ── */}
+        <div className="glass rounded-2xl overflow-hidden">
+          <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--border)' }}>
+            <h3 className="text-sm font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>📍 Location</h3>
+          </div>
+          <div className="p-4">
+            <div className="flex items-center gap-4 p-4 rounded-xl" style={{ background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)' }}>
+              <div className="w-12 h-12 rounded-xl gradient-blue flex items-center justify-center shrink-0">
+                {isLocating ? <Loader2 className="w-5 h-5 text-white animate-spin" /> : <MapPin className="w-5 h-5 text-white" />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-sm text-blue-400">{isLocating ? 'Detecting location...' : 'GPS Location Detected'}</p>
+                <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-secondary)' }}>{location?.address || 'Acquiring GPS signal...'}</p>
+                {location && <p className="text-[10px] font-mono mt-1" style={{ color: 'var(--text-muted)' }}>{location.lat.toFixed(5)}°, {location.lng.toFixed(5)}°</p>}
+              </div>
+              {!isLocating && <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Severity ── */}
+        <div className="glass rounded-2xl overflow-hidden">
+          <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--border)' }}>
+            <h3 className="text-sm font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>⚠️ Severity Level</h3>
+          </div>
+          <div className="p-4 space-y-3">
+            {severityOptions.map(({ level, label, desc, icon, color, bg, border, selectedBorder }) => (
+              <motion.div
+                key={level}
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.99 }}
+                onClick={() => setSeverity(level as any)}
+                className="flex items-center gap-4 p-4 rounded-xl cursor-pointer transition-all"
+                style={{
+                  background: severity === level ? bg : 'rgba(255,255,255,0.02)',
+                  border: `1px solid ${severity === level ? selectedBorder : border}`,
+                  boxShadow: severity === level ? `0 0 16px ${bg}` : 'none',
+                }}
+              >
+                <div className={`${color} shrink-0`}>{icon}</div>
+                <div className="flex-1">
+                  <p className={`font-bold text-sm ${severity === level ? color : ''}`}>{label}</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{desc}</p>
+                </div>
+                <div className="w-5 h-5 rounded-full flex items-center justify-center border-2 shrink-0 transition-all"
+                  style={{ borderColor: severity === level ? selectedBorder : 'var(--border)', background: severity === level ? bg : 'transparent' }}>
+                  {severity === level && <div className="w-2.5 h-2.5 rounded-full" style={{ background: selectedBorder }} />}
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Notes ── */}
+        <div className="glass rounded-2xl overflow-hidden">
+          <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--border)' }}>
+            <h3 className="text-sm font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>📝 Additional Notes <span style={{ color: 'var(--text-muted)' }}>(Optional)</span></h3>
+          </div>
+          <div className="p-4">
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="input-dark min-h-[100px] resize-none"
+              placeholder="Add any helpful details — e.g. near the bus stop, causes tire damage..."
+            />
+          </div>
+        </div>
+
+        {/* ── Submit ── */}
+        <motion.button
+          type="submit"
+          disabled={isSubmitting}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          className="w-full py-4 rounded-2xl font-black text-white text-base transition-all flex items-center justify-center gap-3 disabled:opacity-60"
+          style={{ background: isSubmitting ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg, #3b82f6, #0284c7)', boxShadow: isSubmitting ? 'none' : '0 8px 32px rgba(59,130,246,0.35)' }}
+        >
+          {isSubmitting ? (
+            <><Loader2 className="w-5 h-5 animate-spin" /> Submitting...</>
+          ) : (
+            <><CheckCircle2 className="w-5 h-5" /> Submit Report</>
+          )}
+        </motion.button>
+        <p className="text-center text-xs" style={{ color: 'var(--text-muted)' }}>Photo is required to submit. Your location will be attached automatically.</p>
+      </form>
     </div>
   );
 }
