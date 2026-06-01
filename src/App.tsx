@@ -236,7 +236,7 @@ export default function App() {
             {/* ── Desktop Sidebar ── */}
             <aside className="hidden md:flex sidebar">
               {/* Brand */}
-              <div className="flex items-center gap-3 mb-8">
+              <div className="flex items-center gap-3 mb-5">
                 <div className="w-10 h-10 rounded-xl gradient-blue flex items-center justify-center glow-blue">
                   <Shield className="w-5 h-5 text-white" />
                 </div>
@@ -247,7 +247,7 @@ export default function App() {
               </div>
 
               {/* GPS status pill */}
-              <div className="flex items-center gap-2 glass rounded-xl px-3 py-2 mb-6">
+              <div className="flex items-center gap-2 glass rounded-xl px-3 py-2 mb-4">
                 <div className="pulse-dot w-2 h-2 rounded-full bg-emerald-400" style={{ '--tw-bg-opacity': 1 } as any}>
                   <div className="absolute inset-[-3px] rounded-full bg-emerald-400 opacity-40 animate-ping" />
                 </div>
@@ -257,10 +257,10 @@ export default function App() {
                 </span>
               </div>
 
-              <p className="text-[10px] font-bold uppercase tracking-widest mb-3 px-1" style={{ color: 'var(--text-muted)' }}>Navigation</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-2 px-1" style={{ color: 'var(--text-muted)' }}>Navigation</p>
 
               {/* Nav items */}
-              <nav className="flex-1 space-y-1">
+              <nav className="flex-1 space-y-1" style={{ overflowY: 'auto', minHeight: 0 }}>
                 <SidebarBtn active={activeTab === 'home'} onClick={() => setActiveTab('home')} icon={<HomeIcon className="w-4.5 h-4.5" />} label="Dashboard" data-tour="dashboard" />
                 <SidebarBtn active={activeTab === 'map'}  onClick={() => setActiveTab('map')}  icon={<MapIcon  className="w-4.5 h-4.5" />} label="Live Map"   data-tour="map" />
                 <SidebarBtn active={activeTab === 'history'} onClick={() => setActiveTab('history')} icon={<History className="w-4.5 h-4.5" />} label="Report History" data-tour="history" />
@@ -278,25 +278,23 @@ export default function App() {
 
               {/* User card */}
               <div className="pt-4" style={{ borderTop: '1px solid var(--border)' }}>
-                <div className="flex items-center gap-2 p-3 rounded-xl glass">
+                <div className="flex items-center gap-3 p-3 rounded-xl glass mb-2">
                   <div className="relative">
                     <img src={user.avatarUrl || `https://ui-avatars.com/api/?name=${user.email}&background=3b82f6&color=fff`}
-                      className="w-9 h-9 rounded-xl object-cover" alt="User" />
+                      className="w-10 h-10 rounded-xl object-cover" alt="User" />
                     <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-400 rounded-full border-2" style={{ borderColor: 'var(--bg-primary)' }} />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="font-bold text-sm truncate">{user.name || 'Guardian'}</p>
                     <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{user.email}</p>
                   </div>
-                  <button onClick={() => setActiveTab('profile')} title="Profile Settings"
-                    className="p-1.5 rounded-lg transition-all hover:bg-white/10" style={{ color: 'var(--text-muted)' }}>
+                  <button onClick={() => setActiveTab('profile')} className="p-1.5 rounded-lg transition-all" style={{ color: 'var(--text-muted)' }}>
                     <Settings className="w-4 h-4" />
                   </button>
-                  <button onClick={handleLogout} title="Sign Out"
-                    className="p-1.5 rounded-lg transition-all hover:bg-red-500/15 text-red-400">
-                    <LogOut className="w-4 h-4" />
-                  </button>
                 </div>
+                <button onClick={handleLogout} className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all hover:bg-red-500/10 text-red-400">
+                  <LogOut className="w-4 h-4" /> Sign Out
+                </button>
               </div>
             </aside>
 

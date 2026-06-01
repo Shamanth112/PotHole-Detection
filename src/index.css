@@ -123,17 +123,9 @@ body {
   z-index: 50;
   display: flex;
   flex-direction: column;
-  padding: 1.5rem;
+  padding: 1.25rem;
   overflow: hidden;
 }
-
-/* Allows nav items to scroll while Sign Out stays pinned at bottom */
-.sidebar nav {
-  overflow-y: auto;
-  min-height: 0;
-}
-.sidebar nav::-webkit-scrollbar { width: 3px; }
-.sidebar nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 10px; }
 
 .sidebar-nav-item {
   display: flex;
