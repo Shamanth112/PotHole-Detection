@@ -124,6 +124,8 @@ body {
   display: flex;
   flex-direction: column;
   padding: 1.5rem;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .sidebar-nav-item {
