@@ -17,7 +17,7 @@ import {
   LayoutDashboard, Map as MapIcon, Camera as CameraIcon, LogOut, ShieldAlert,
   Activity, Settings, ShieldCheck, ArrowLeft, User as UserIcon,
   History, Scan, Home as HomeIcon, ChevronRight, Bell, Award,
-  Shield, Loader2, FileText, Zap, TrendingUp, Star
+  Shield, Loader2, FileText, Zap, TrendingUp, Star, Menu, X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import confetti from 'canvas-confetti';
@@ -35,6 +35,7 @@ export default function App() {
   const convex = useConvex();
 
   const [activeTab, setActiveTab] = useState<Tab>('home');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth >= 768);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const { potholes } = usePotholes();
   const navigate = useNavigate();
@@ -59,6 +60,11 @@ export default function App() {
   };
 
   const handleLogout = async () => { await signOut(); navigate('/'); };
+
+  const handleNavClick = (tab: Tab) => {
+    setActiveTab(tab);
+    if (window.innerWidth < 768) setIsSidebarOpen(false);
+  };
 
   const handleProfilePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -233,17 +239,34 @@ export default function App() {
           <div className="flex min-h-screen app-bg">
             <OnboardingTour userName={user.name || 'Road Guardian'} />
 
-            {/* ── Desktop Sidebar ── */}
-            <aside className="hidden md:flex sidebar">
+            {/* Mobile Sidebar Overlay Backdrop */}
+            {isSidebarOpen && (
+              <div 
+                className="fixed inset-0 bg-black/60 backdrop-blur-sm md:hidden"
+                style={{ zIndex: 45 }}
+                onClick={() => setIsSidebarOpen(false)}
+              />
+            )}
+
+            {/* ── Sidebar ── */}
+            <aside className={`sidebar ${isSidebarOpen ? 'open' : ''} flex flex-col`}>
               {/* Brand */}
-              <div className="flex items-center gap-3 mb-5">
-                <div className="w-10 h-10 rounded-xl gradient-blue flex items-center justify-center glow-blue">
-                  <Shield className="w-5 h-5 text-white" />
+              <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl gradient-blue flex items-center justify-center glow-blue">
+                    <Shield className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <span className="font-black text-lg tracking-tight">Road<span className="gradient-text-blue">Guard</span></span>
+                    <p className="text-[10px] font-medium uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>AI Platform</p>
+                  </div>
                 </div>
-                <div>
-                  <span className="font-black text-lg tracking-tight">Road<span className="gradient-text-blue">Guard</span></span>
-                  <p className="text-[10px] font-medium uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>AI Platform</p>
-                </div>
+                <button 
+                  onClick={() => setIsSidebarOpen(false)} 
+                  className="p-1.5 rounded-lg glass text-zinc-400 hover:text-white transition-all md:hidden"
+                >
+                  <X className="w-4.5 h-4.5" />
+                </button>
               </div>
 
               {/* GPS status pill */}
@@ -261,17 +284,17 @@ export default function App() {
 
               {/* Nav items */}
               <nav className="flex-1 space-y-1" style={{ overflowY: 'auto', minHeight: 0 }}>
-                <SidebarBtn active={activeTab === 'home'} onClick={() => setActiveTab('home')} icon={<HomeIcon className="w-4.5 h-4.5" />} label="Dashboard" data-tour="dashboard" />
-                <SidebarBtn active={activeTab === 'map'}  onClick={() => setActiveTab('map')}  icon={<MapIcon  className="w-4.5 h-4.5" />} label="Live Map"   data-tour="map" />
-                <SidebarBtn active={activeTab === 'history'} onClick={() => setActiveTab('history')} icon={<History className="w-4.5 h-4.5" />} label="Report History" data-tour="history" />
-                <SidebarBtn active={activeTab === 'scan'} onClick={() => setActiveTab('scan')} icon={<Scan className="w-4.5 h-4.5" />} label="AI Scanner" data-tour="scan" />
-                <SidebarBtn active={activeTab === 'report'} onClick={() => setActiveTab('report')} icon={<FileText className="w-4.5 h-4.5" />} label="Report" data-tour="report" />
+                <SidebarBtn active={activeTab === 'home'} onClick={() => handleNavClick('home')} icon={<HomeIcon className="w-4.5 h-4.5" />} label="Dashboard" data-tour="dashboard" />
+                <SidebarBtn active={activeTab === 'map'}  onClick={() => handleNavClick('map')}  icon={<MapIcon  className="w-4.5 h-4.5" />} label="Live Map"   data-tour="map" />
+                <SidebarBtn active={activeTab === 'history'} onClick={() => handleNavClick('history')} icon={<History className="w-4.5 h-4.5" />} label="Report History" data-tour="history" />
+                <SidebarBtn active={activeTab === 'scan'} onClick={() => handleNavClick('scan')} icon={<Scan className="w-4.5 h-4.5" />} label="AI Scanner" data-tour="scan" />
+                <SidebarBtn active={activeTab === 'report'} onClick={() => handleNavClick('report')} icon={<FileText className="w-4.5 h-4.5" />} label="Report" data-tour="report" />
 
                 {user.role === 'admin' && (
                   <>
                     <div className="section-divider my-2" />
                     <p className="text-[10px] font-bold uppercase tracking-widest mb-2 px-1" style={{ color: 'var(--text-muted)' }}>Admin</p>
-                    <SidebarBtn active={false} onClick={() => navigate('/admin')} icon={<ShieldCheck className="w-4.5 h-4.5 text-emerald-400" />} label="Admin Console" />
+                    <SidebarBtn active={false} onClick={() => { navigate('/admin'); if (window.innerWidth < 768) setIsSidebarOpen(false); }} icon={<ShieldCheck className="w-4.5 h-4.5 text-emerald-400" />} label="Admin Console" />
                   </>
                 )}
               </nav>
@@ -288,11 +311,11 @@ export default function App() {
                     <p className="font-bold text-sm truncate">{user.name || 'Guardian'}</p>
                     <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{user.email}</p>
                   </div>
-                  <button onClick={() => setActiveTab('profile')} className="p-1.5 rounded-lg transition-all" style={{ color: 'var(--text-muted)' }}>
+                  <button onClick={() => handleNavClick('profile')} className="p-1.5 rounded-lg transition-all" style={{ color: 'var(--text-muted)' }}>
                     <Settings className="w-4 h-4" />
                   </button>
                 </div>
-                <button onClick={handleLogout} className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all hover:bg-red-500/10 text-red-400">
+                <button onClick={() => { handleLogout(); if (window.innerWidth < 768) setIsSidebarOpen(false); }} className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all hover:bg-red-500/10 text-red-400">
                   <LogOut className="w-4 h-4" /> Sign Out
                 </button>
               </div>
@@ -304,6 +327,12 @@ export default function App() {
               {/* ── Mobile Top App-Bar (hidden on md+) ── */}
               <div className="mobile-header md:hidden">
                 <div className="flex items-center gap-2.5">
+                  <button 
+                    onClick={() => setIsSidebarOpen(true)} 
+                    className="p-1.5 rounded-lg glass text-zinc-300 hover:text-white mr-1"
+                  >
+                    <Menu className="w-4.5 h-4.5" />
+                  </button>
                   <div className="w-8 h-8 rounded-xl gradient-blue flex items-center justify-center">
                     <Shield className="w-4 h-4 text-white" />
                   </div>
@@ -330,10 +359,24 @@ export default function App() {
               </div>
 
               {/* Desktop top bar */}
-              <div className="hidden md:flex h-16 glass-strong items-center justify-between px-6 sticky top-0 z-40 border-b" style={{ borderColor: 'var(--border)', marginLeft: '260px' }}>
-                <div>
-                  <h2 className="font-bold text-base capitalize">{activeTab === 'home' ? 'Dashboard' : activeTab === 'scan' ? 'AI Scanner' : activeTab.replace('-', ' ')}</h2>
-                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Welcome back, {user.name?.split(' ')[0] || 'Guardian'} 👋</p>
+              <div 
+                className="hidden md:flex h-16 glass-strong items-center justify-between px-6 sticky top-0 z-40 border-b transition-all duration-300" 
+                style={{ 
+                  borderColor: 'var(--border)', 
+                  marginLeft: isSidebarOpen ? '260px' : '0' 
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <button 
+                    onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
+                    className="p-2 rounded-xl glass hover:bg-white/5 transition-all text-zinc-300 hover:text-white"
+                  >
+                    <Menu className="w-4.5 h-4.5" />
+                  </button>
+                  <div>
+                    <h2 className="font-bold text-base capitalize">{activeTab === 'home' ? 'Dashboard' : activeTab === 'scan' ? 'AI Scanner' : activeTab.replace('-', ' ')}</h2>
+                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Welcome back, {user.name?.split(' ')[0] || 'Guardian'} 👋</p>
+                  </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <button className="relative p-2 rounded-xl glass" style={{ color: 'var(--text-secondary)' }}>
@@ -347,11 +390,15 @@ export default function App() {
               </div>
 
               {/* Content area — fullbleed for camera/map on mobile, safe-area padded otherwise */}
-              <div className={`flex-1 overflow-hidden md:ml-[260px] md:pb-0 ${
-                activeTab === 'scan' || activeTab === 'map'
-                  ? 'mobile-main-fullbleed'
-                  : 'mobile-main-content'
-              }`}>
+              <div 
+                className={`flex-1 overflow-hidden md:pb-0 transition-all duration-300 ${
+                  isSidebarOpen ? 'md:ml-[260px]' : 'md:ml-0'
+                } ${
+                  activeTab === 'scan' || activeTab === 'map'
+                    ? 'mobile-main-fullbleed'
+                    : 'mobile-main-content'
+                }`}
+              >
                 <AnimatePresence mode="wait">
                   {activeTab === 'home' && (
                     <motion.div key="home" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }} className="h-full overflow-y-auto">
