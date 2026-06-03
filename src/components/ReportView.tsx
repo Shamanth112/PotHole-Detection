@@ -69,20 +69,23 @@ export default function ReportView({ onBack, onSubmit, userId }: ReportViewProps
   ];
 
   return (
-    <div className="min-h-full p-4 md:p-8 max-w-2xl mx-auto space-y-6">
-      {/* ── Header ── */}
-      <div className="flex items-center gap-4">
-        <button onClick={onBack} className="w-10 h-10 rounded-xl glass flex items-center justify-center transition-all hover:bg-white/10" style={{ color: 'var(--text-secondary)' }}>
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        <div>
-          <h1 className="text-2xl font-black tracking-tight">Report <span className="gradient-text-blue">Pothole</span></h1>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Help improve road safety in your city</p>
+    <div className="min-h-full flex flex-col">
+      {/* Scrollable content area */}
+      <div className="flex-1 p-4 md:p-8 max-w-2xl mx-auto w-full space-y-4 md:space-y-6 pb-28 md:pb-6">
+        {/* ── Header ── */}
+        <div className="flex items-center gap-4">
+          <button onClick={onBack} className="w-10 h-10 rounded-xl glass flex items-center justify-center transition-all hover:bg-white/10" style={{ color: 'var(--text-secondary)' }}>
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <div>
+            <h1 className="text-xl md:text-2xl font-black tracking-tight">Report <span className="gradient-text-blue">Pothole</span></h1>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Help improve road safety in your city</p>
+          </div>
         </div>
-      </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* ── Photo Upload ── */}
+        {/* Form sections — fields read from React state, submit is in sticky footer */}
+        <div className="space-y-4 md:space-y-6">
+          {/* ── Photo Upload ── */}
         <div className="glass rounded-2xl overflow-hidden">
           <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--border)' }}>
             <h3 className="text-sm font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>📸 Photo Evidence</h3>
@@ -175,36 +178,47 @@ export default function ReportView({ onBack, onSubmit, userId }: ReportViewProps
 
         {/* ── Notes ── */}
         <div className="glass rounded-2xl overflow-hidden">
-          <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--border)' }}>
+          <div className="px-5 py-3 md:py-4" style={{ borderBottom: '1px solid var(--border)' }}>
             <h3 className="text-sm font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>📝 Additional Notes <span style={{ color: 'var(--text-muted)' }}>(Optional)</span></h3>
           </div>
           <div className="p-4">
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="input-dark min-h-[100px] resize-none"
+              className="input-dark min-h-[80px] md:min-h-[100px] resize-none"
               placeholder="Add any helpful details — e.g. near the bus stop, causes tire damage..."
             />
           </div>
-        </div>
+        </div>{/* end notes card */}
+        </div>{/* end space-y fields wrapper */}
+      </div>{/* end scrollable content */}
 
-        {/* ── Submit ── */}
-        <motion.button
-          type="submit"
-          disabled={isSubmitting}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          className="w-full py-4 rounded-2xl font-black text-white text-base transition-all flex items-center justify-center gap-3 disabled:opacity-60"
-          style={{ background: isSubmitting ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg, #3b82f6, #0284c7)', boxShadow: isSubmitting ? 'none' : '0 8px 32px rgba(59,130,246,0.35)' }}
-        >
-          {isSubmitting ? (
-            <><Loader2 className="w-5 h-5 animate-spin" /> Submitting...</>
-          ) : (
-            <><CheckCircle2 className="w-5 h-5" /> Submit Report</>
-          )}
-        </motion.button>
-        <p className="text-center text-xs" style={{ color: 'var(--text-muted)' }}>Photo is required to submit. Your location will be attached automatically.</p>
-      </form>
+      {/* ── Sticky Submit — pinned to bottom on mobile ── */}
+      <div
+        className="sticky bottom-0 left-0 right-0 p-4 md:static md:p-0 md:max-w-2xl md:mx-auto md:w-full"
+        style={{
+          background: 'linear-gradient(to top, var(--bg-primary) 70%, transparent)',
+          paddingBottom: 'max(1rem, calc(0.5rem + env(safe-area-inset-bottom)))',
+        }}
+      >
+        <form onSubmit={handleSubmit}>
+          <motion.button
+            type="submit"
+            disabled={isSubmitting}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="w-full py-4 rounded-2xl font-black text-white text-base transition-all flex items-center justify-center gap-3 disabled:opacity-60"
+            style={{ background: isSubmitting ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg, #3b82f6, #0284c7)', boxShadow: isSubmitting ? 'none' : '0 8px 32px rgba(59,130,246,0.35)' }}
+          >
+            {isSubmitting ? (
+              <><Loader2 className="w-5 h-5 animate-spin" /> Submitting...</>
+            ) : (
+              <><CheckCircle2 className="w-5 h-5" /> Submit Report</>
+            )}
+          </motion.button>
+          <p className="text-center text-xs mt-2" style={{ color: 'var(--text-muted)' }}>Photo is required. Your location will be attached automatically.</p>
+        </form>
+      </div>
     </div>
   );
 }

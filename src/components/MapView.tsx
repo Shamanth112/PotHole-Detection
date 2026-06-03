@@ -178,7 +178,7 @@ export default function MapView({ potholes, onAddReport }: MapViewProps) {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => setMapCenter(userLocation)}
-            className="absolute bottom-24 right-4 z-10 w-12 h-12 rounded-2xl flex items-center justify-center glass-strong transition-all"
+            className="absolute bottom-36 md:bottom-24 right-4 z-10 w-12 h-12 rounded-2xl flex items-center justify-center glass-strong transition-all"
             style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.4)' }}
           >
             <LocateFixed className="w-5 h-5 text-blue-400" />
@@ -191,7 +191,7 @@ export default function MapView({ potholes, onAddReport }: MapViewProps) {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={onAddReport}
-            className="absolute bottom-6 right-4 z-10 w-14 h-14 rounded-2xl flex items-center justify-center text-white"
+            className="absolute bottom-20 md:bottom-6 right-4 z-10 w-14 h-14 rounded-2xl flex items-center justify-center text-white"
             style={{ background: 'linear-gradient(135deg, #3b82f6, #06b6d4)', boxShadow: '0 8px 24px rgba(59,130,246,0.45)' }}
           >
             <Plus className="w-7 h-7" />

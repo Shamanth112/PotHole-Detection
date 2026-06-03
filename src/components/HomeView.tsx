@@ -22,20 +22,21 @@ export default function HomeView({ userRole, onStartDetection, onReportManually,
   ];
 
   return (
-    <div className="min-h-full p-4 md:p-8 space-y-6 max-w-5xl mx-auto">
+    <div className="min-h-full p-4 md:p-8 space-y-5 md:space-y-6 max-w-5xl mx-auto">
       {/* ── Greeting ── */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-        <h1 className="text-3xl md:text-4xl font-black tracking-tight">
-          Good {getGreeting()}, <br className="md:hidden" />
+        <h1 className="text-2xl md:text-4xl font-black tracking-tight">
+          Good {getGreeting()},&nbsp;
           <span className="gradient-text-blue">{userName.split(' ')[0]}</span> 👋
         </h1>
-        <p className="text-sm mt-2" style={{ color: 'var(--text-secondary)' }}>
+        <p className="text-sm mt-1.5" style={{ color: 'var(--text-secondary)' }}>
           Your city's road health dashboard — real-time AI monitoring
         </p>
       </motion.div>
 
       {/* ── Stat Cards ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* Always 3-col: compact on mobile, wider gap on desktop */}
+      <div className="grid grid-cols-3 gap-2.5 md:gap-4">
         {statCards.map(({ label, value, icon, color, bg, border, glow }, i) => (
           <motion.div
             key={label}
@@ -46,13 +47,17 @@ export default function HomeView({ userRole, onStartDetection, onReportManually,
             style={{ boxShadow: glow }}
           >
             {/* Background decoration */}
-            <div className="absolute -top-4 -right-4 w-20 h-20 rounded-full opacity-10" style={{ background: `radial-gradient(circle, ${bg.replace('0.1', '1')}, transparent)` }} />
+            <div className="absolute -top-4 -right-4 w-16 h-16 md:w-20 md:h-20 rounded-full opacity-10" style={{ background: `radial-gradient(circle, ${bg.replace('0.1', '1')}, transparent)` }} />
 
-            <div className="flex items-start justify-between relative z-10">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--text-muted)' }}>{label}</p>
+            <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between relative z-10">
+              {/* Icon — hidden on very small screens to save space */}
+              <div className="hidden sm:flex p-2 rounded-xl shrink-0" style={{ background: bg, border: `1px solid ${border}` }}>
+                <div className={color}>{icon}</div>
+              </div>
+              <div className="flex-1">
+                <p className="text-[9px] sm:text-[11px] font-semibold uppercase tracking-widest mb-1 md:mb-3" style={{ color: 'var(--text-muted)' }}>{label}</p>
                 <motion.p
-                  className={`text-4xl font-black ${color}`}
+                  className={`text-2xl md:text-4xl font-black ${color}`}
                   initial={{ opacity: 0, scale: 0.5 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: i * 0.1 + 0.2, type: 'spring', stiffness: 200 }}
@@ -60,40 +65,36 @@ export default function HomeView({ userRole, onStartDetection, onReportManually,
                   {value}
                 </motion.p>
               </div>
-              <div className="p-2.5 rounded-xl" style={{ background: bg, border: `1px solid ${border}` }}>
-                <div className={color}>{icon}</div>
-              </div>
             </div>
-            <div className="mt-4 flex items-center gap-1.5 text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
-              <TrendingUp className="w-3 h-3" />
-              <span>Live data</span>
+            <div className="mt-2 md:mt-4 flex items-center gap-1 text-[9px] md:text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+              <TrendingUp className="w-2.5 h-2.5 md:w-3 md:h-3" />
+              <span className="hidden sm:inline">Live data</span>
+              <span className="sm:hidden">• live</span>
             </div>
           </motion.div>
         ))}
       </div>
 
       {/* ── Action Buttons ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
         <motion.button
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.3 }}
           onClick={onStartDetection}
-          className="group relative overflow-hidden rounded-2xl p-6 text-left transition-all hover:scale-[1.02] active:scale-[0.98]"
+          className="group relative overflow-hidden rounded-2xl p-5 md:p-6 text-left transition-all hover:scale-[1.02] active:scale-[0.98]"
           style={{ background: 'linear-gradient(135deg, #1d4ed8 0%, #0284c7 100%)', boxShadow: '0 8px 32px rgba(59,130,246,0.3)' }}
         >
-          {/* Shine sweep */}
-          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-            style={{ background: 'linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.1) 50%, transparent 60%)', transform: 'translateX(-100%)', animation: 'none' }} />
           <div className="absolute inset-0 group-hover:translate-x-full transition-transform duration-700"
             style={{ background: 'linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.08) 50%, transparent 60%)' }} />
-
-          <div className="relative z-10">
-            <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center mb-4">
-              <Zap className="w-6 h-6 text-white" />
+          <div className="relative z-10 flex sm:flex-col items-center sm:items-start gap-4 sm:gap-0">
+            <div className="w-11 h-11 md:w-12 md:h-12 rounded-xl bg-white/20 flex items-center justify-center sm:mb-4 shrink-0">
+              <Zap className="w-5 h-5 md:w-6 md:h-6 text-white" />
             </div>
-            <h3 className="text-lg font-black text-white uppercase tracking-tight">Start AI Detection</h3>
-            <p className="text-sm text-blue-100/70 mt-1">Real-time pothole scanning via camera</p>
+            <div>
+              <h3 className="text-base md:text-lg font-black text-white uppercase tracking-tight">Start AI Detection</h3>
+              <p className="text-xs md:text-sm text-blue-100/70 mt-0.5">Real-time pothole scanning via camera</p>
+            </div>
           </div>
           <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
             <ChevronRight className="w-5 h-5 text-white/50" />
@@ -105,15 +106,17 @@ export default function HomeView({ userRole, onStartDetection, onReportManually,
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.35 }}
           onClick={onReportManually}
-          className="group relative overflow-hidden glass-hover rounded-2xl p-6 text-left transition-all hover:scale-[1.02] active:scale-[0.98]"
+          className="group relative overflow-hidden glass-hover rounded-2xl p-5 md:p-6 text-left transition-all hover:scale-[1.02] active:scale-[0.98]"
           style={{ border: '1px solid rgba(255,255,255,0.1)' }}
         >
-          <div className="relative z-10">
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4" style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)' }}>
-              <FileText className="w-6 h-6" style={{ color: 'var(--text-secondary)' }} />
+          <div className="relative z-10 flex sm:flex-col items-center sm:items-start gap-4 sm:gap-0">
+            <div className="w-11 h-11 md:w-12 md:h-12 rounded-xl flex items-center justify-center sm:mb-4 shrink-0" style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)' }}>
+              <FileText className="w-5 h-5 md:w-6 md:h-6" style={{ color: 'var(--text-secondary)' }} />
             </div>
-            <h3 className="text-lg font-black uppercase tracking-tight">Manual Report</h3>
-            <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>Manually submit a pothole with location & photo</p>
+            <div>
+              <h3 className="text-base md:text-lg font-black uppercase tracking-tight">Manual Report</h3>
+              <p className="text-xs md:text-sm mt-0.5" style={{ color: 'var(--text-secondary)' }}>Manually submit a pothole with location & photo</p>
+            </div>
           </div>
           <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
             <ChevronRight className="w-5 h-5" style={{ color: 'var(--text-muted)' }} />

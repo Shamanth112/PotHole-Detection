@@ -56,7 +56,7 @@ export default function PotholeList({ potholes }: PotholeListProps) {
   };
 
   return (
-    <div className="min-h-full p-4 md:p-8 max-w-6xl mx-auto space-y-6">
+    <div className="min-h-full p-4 md:p-8 max-w-6xl mx-auto space-y-5 md:space-y-6">
       {/* ── Header ── */}
       <div>
         <h1 className="text-2xl md:text-3xl font-black tracking-tight">Report <span className="gradient-text-blue">History</span></h1>
@@ -64,7 +64,7 @@ export default function PotholeList({ potholes }: PotholeListProps) {
       </div>
 
       {/* ── Filters ── */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className="flex flex-col gap-3">
         {/* Search */}
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
@@ -76,8 +76,8 @@ export default function PotholeList({ potholes }: PotholeListProps) {
             className="input-dark pl-10"
           />
         </div>
-        {/* Severity filter */}
-        <div className="flex gap-2">
+        {/* Severity filter — horizontally scrollable on mobile */}
+        <div className="chip-scroll">
           {(['all', 'high', 'medium', 'low'] as const).map((f) => (
             <button
               key={f}
@@ -89,7 +89,7 @@ export default function PotholeList({ potholes }: PotholeListProps) {
                 color: filter === f ? '#60a5fa' : 'var(--text-secondary)',
               }}
             >
-              {f}
+              {f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)}
             </button>
           ))}
         </div>

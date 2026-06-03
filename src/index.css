@@ -211,6 +211,7 @@ body {
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
+  position: relative;
 }
 
 /* ─── Scan FAB ───────────────────────────────────────── */
@@ -420,3 +421,81 @@ body {
 /* ─── Utility overrides ──────────────────────────────── */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ─── Mobile-First Enhancements ─────────────────────── */
+
+/* Fix iOS 100vh bug using dynamic viewport height */
+.app-bg   { min-height: 100dvh; }
+.login-bg { min-height: 100dvh; }
+
+/* Prevent iOS bounce-scroll on the shell */
+body { overscroll-behavior: none; }
+
+/* Clean tap behavior — remove the grey flash on press */
+*, button, a, [role="button"] { -webkit-tap-highlight-color: transparent; }
+button, a, [role="button"] { touch-action: manipulation; }
+
+/* Smooth momentum scrolling on iOS for any scrollable container */
+.overflow-y-auto, .overflow-auto { -webkit-overflow-scrolling: touch; }
+
+/* ── Mobile Top App-Bar ─────────────────────────────── */
+.mobile-header {
+  display: none;                                /* hidden on desktop */
+  height: 56px;
+  background: rgba(6, 11, 24, 0.96);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  padding: 0 1rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* ── Horizontal-scroll chip row (filter pills, map chips) */
+.chip-scroll {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.chip-scroll::-webkit-scrollbar { display: none; }
+.chip-scroll > * { flex-shrink: 0; scroll-snap-align: start; }
+
+/* ── Mobile-only overrides ──────────────────────────── */
+@media (max-width: 767px) {
+
+  /* Reveal the mobile top app-bar */
+  .mobile-header { display: flex; }
+
+  /* Content area with safe-area-aware bottom padding (clears fixed nav) */
+  .mobile-main-content {
+    padding-bottom: max(5.5rem, calc(4.5rem + env(safe-area-inset-bottom)));
+  }
+
+  /* Fullbleed views (camera, map) — zero bottom pad, FABs handle spacing */
+  .mobile-main-fullbleed { padding-bottom: 0 !important; }
+
+  /* Bottom nav — push above the home-indicator bar on iOS */
+  .mobile-nav {
+    padding-bottom: max(0.75rem, calc(0.25rem + env(safe-area-inset-bottom)));
+  }
+
+  /* Minimum 44 px tap targets (Apple HIG) */
+  .mobile-nav-btn { min-height: 44px; }
+  .nav-icon       { width: 36px; height: 36px; }
+
+  /* Compact stat cards */
+  .stat-card { padding: 0.875rem; border-radius: 14px; }
+
+  /* Ensure primary/secondary buttons are comfortably tappable */
+  .btn-primary, .btn-secondary { min-height: 48px; }
+
+  /* Slightly tighter input on mobile */
+  .input-dark { font-size: 1rem; /* prevent iOS zoom-in on focus */ }
+}
+

@@ -300,6 +300,35 @@ export default function App() {
 
             {/* ── Main Content ── */}
             <main className="flex-1 flex flex-col" style={{ marginLeft: '0' }}>
+
+              {/* ── Mobile Top App-Bar (hidden on md+) ── */}
+              <div className="mobile-header md:hidden">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl gradient-blue flex items-center justify-center">
+                    <Shield className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-black text-sm leading-tight">
+                      {activeTab === 'home' ? 'Dashboard' : activeTab === 'scan' ? 'AI Scanner' : activeTab === 'report' ? 'Report' : activeTab === 'map' ? 'Live Map' : activeTab === 'history' ? 'History' : 'Profile'}
+                    </p>
+                    <p className="text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>RoadGuard AI</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button className="relative p-2 rounded-xl glass" style={{ color: 'var(--text-secondary)' }}>
+                    <Bell className="w-4 h-4" />
+                    <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-blue-500 rounded-full" />
+                  </button>
+                  <img
+                    src={user.avatarUrl || `https://ui-avatars.com/api/?name=${user.email}&background=3b82f6&color=fff`}
+                    className="w-8 h-8 rounded-xl object-cover border cursor-pointer"
+                    style={{ borderColor: 'var(--border)' }}
+                    onClick={() => setActiveTab('profile')}
+                    alt="User"
+                  />
+                </div>
+              </div>
+
               {/* Desktop top bar */}
               <div className="hidden md:flex h-16 glass-strong items-center justify-between px-6 sticky top-0 z-40 border-b" style={{ borderColor: 'var(--border)', marginLeft: '260px' }}>
                 <div>
@@ -317,8 +346,12 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Content area */}
-              <div className="flex-1 overflow-hidden md:ml-[260px] pb-24 md:pb-0">
+              {/* Content area — fullbleed for camera/map on mobile, safe-area padded otherwise */}
+              <div className={`flex-1 overflow-hidden md:ml-[260px] md:pb-0 ${
+                activeTab === 'scan' || activeTab === 'map'
+                  ? 'mobile-main-fullbleed'
+                  : 'mobile-main-content'
+              }`}>
                 <AnimatePresence mode="wait">
                   {activeTab === 'home' && (
                     <motion.div key="home" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }} className="h-full overflow-y-auto">
@@ -371,7 +404,14 @@ export default function App() {
 
               {/* Scan FAB */}
               <div className="flex flex-col items-center gap-1" data-tour="mobile-scan">
-                <button onClick={() => setActiveTab('scan')} className="scan-fab">
+                <button
+                  onClick={() => setActiveTab('scan')}
+                  className="scan-fab"
+                  style={{ boxShadow: activeTab === 'scan'
+                    ? '0 4px 24px rgba(59,130,246,0.7), 0 0 50px rgba(6,182,212,0.3)'
+                    : '0 4px 20px rgba(59,130,246,0.5), 0 0 40px rgba(6,182,212,0.2)'
+                  }}
+                >
                   <Scan className="w-6 h-6 text-white" />
                 </button>
                 <span className="text-[9px] font-bold uppercase tracking-widest" style={{ color: activeTab === 'scan' ? '#60a5fa' : 'var(--text-muted)' }}>Scan</span>
@@ -402,7 +442,21 @@ function SidebarBtn({ active, onClick, icon, label, 'data-tour': dataTour }: { a
 function MobileNavBtn({ active, onClick, icon, label, 'data-tour': dataTour }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string; 'data-tour'?: string }) {
   return (
     <button onClick={onClick} data-tour={dataTour} className={`mobile-nav-btn ${active ? 'active' : ''}`}>
-      <div className="nav-icon">{icon}</div>
+      <div className="nav-icon" style={active ? { background: 'rgba(59,130,246,0.15)' } : {}}>
+        {icon}
+        {active && (
+          <span
+            style={{
+              position: 'absolute',
+              top: 3, left: '50%',
+              transform: 'translateX(-50%)',
+              width: 20, height: 3,
+              borderRadius: 2,
+              background: 'linear-gradient(90deg, #3b82f6, #06b6d4)',
+            }}
+          />
+        )}
+      </div>
       <span>{label}</span>
     </button>
   );
