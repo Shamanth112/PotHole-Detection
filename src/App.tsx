@@ -17,7 +17,7 @@ import {
   LayoutDashboard, Map as MapIcon, Camera as CameraIcon, LogOut, ShieldAlert,
   Activity, Settings, ShieldCheck, ArrowLeft, User as UserIcon,
   History, Scan, Home as HomeIcon, ChevronRight, Bell, Award,
-  Shield, Loader2, FileText, Zap, TrendingUp, Star, Menu, X
+  Shield, Loader2, FileText, Zap, TrendingUp, Star, Menu, X, MapPin
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import confetti from 'canvas-confetti';
@@ -40,19 +40,83 @@ export default function App() {
   const { potholes } = usePotholes();
   const navigate = useNavigate();
 
+  const [locationPermission, setLocationPermission] = useState<'prompt' | 'granted' | 'denied'>('prompt');
+  const [cameraPermission, setCameraPermission] = useState<'prompt' | 'granted' | 'denied'>('prompt');
+
   useEffect(() => {
-    if ("geolocation" in navigator) {
-      const watchId = navigator.geolocation.watchPosition((position) => {
-        setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
-      }, (error) => console.error("Error watching position:", error), { enableHighAccuracy: true });
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        navigator.mediaDevices.getUserMedia({ video: true })
-          .then(stream => stream.getTracks().forEach(track => track.stop()))
-          .catch(err => console.error("Camera permission denied:", err));
-      }
-      return () => navigator.geolocation.clearWatch(watchId);
+    // 1. Geolocation Permission Query
+    if (navigator.permissions && navigator.permissions.query) {
+      navigator.permissions.query({ name: 'geolocation' }).then((result) => {
+        setLocationPermission(result.state);
+        result.onchange = () => {
+          setLocationPermission(result.state);
+        };
+      }).catch(err => console.error("Error querying location permission:", err));
+
+      // 2. Camera Permission Query
+      navigator.permissions.query({ name: 'camera' as any }).then((result) => {
+        setCameraPermission(result.state);
+        result.onchange = () => {
+          setCameraPermission(result.state);
+        };
+      }).catch(() => {
+        navigator.mediaDevices?.enumerateDevices().then(devices => {
+          const hasLabels = devices.some(d => d.label !== "");
+          if (hasLabels) setCameraPermission('granted');
+        }).catch(() => {});
+      });
     }
   }, []);
+
+  // Geolocation position watcher
+  useEffect(() => {
+    if (locationPermission === 'granted' && "geolocation" in navigator) {
+      const watchId = navigator.geolocation.watchPosition((position) => {
+        setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
+      }, (error) => {
+        console.error("Error watching position:", error);
+        if (error.code === error.PERMISSION_DENIED) {
+          setLocationPermission('denied');
+        }
+      }, { enableHighAccuracy: true });
+      return () => navigator.geolocation.clearWatch(watchId);
+    }
+  }, [locationPermission]);
+
+  const requestPermissions = async () => {
+    // Request Location
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
+          setLocationPermission('granted');
+        },
+        (error) => {
+          console.error("Location request error:", error);
+          if (error.code === error.PERMISSION_DENIED) {
+            setLocationPermission('denied');
+          }
+        },
+        { enableHighAccuracy: true }
+      );
+    } else {
+      setLocationPermission('denied');
+    }
+
+    // Request Camera
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        stream.getTracks().forEach(track => track.stop());
+        setCameraPermission('granted');
+      } catch (err: any) {
+        console.error("Camera request error:", err);
+        setCameraPermission('denied');
+      }
+    } else {
+      setCameraPermission('denied');
+    }
+  };
 
   const handleLogin = async () => {
     try { await signIn("google"); }
@@ -119,6 +183,80 @@ export default function App() {
           </div>
           <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>Loading RoadGuard...</p>
         </div>
+      </div>
+    );
+  }
+
+  if (user && (locationPermission !== 'granted' || cameraPermission !== 'granted')) {
+    return (
+      <div className="min-h-screen login-bg flex flex-col items-center justify-center p-6 relative overflow-hidden text-white">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full opacity-10" style={{ background: 'radial-gradient(circle, #3b82f6, transparent)' }} />
+        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 rounded-full opacity-8" style={{ background: 'radial-gradient(circle, #06b6d4, transparent)' }} />
+        
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }} 
+          animate={{ opacity: 1, y: 0 }} 
+          className="w-full max-w-md glass-strong rounded-3xl p-8 space-y-6 text-center relative z-10 animate-float"
+        >
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-500/20 text-blue-400 mb-2">
+            <Shield className="w-8 h-8 text-blue-400" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-black tracking-tight">Permissions Required</h2>
+            <p className="text-xs mt-2 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+              RoadGuard needs Location and Camera access to scan road potholes and tag report locations.
+            </p>
+          </div>
+
+          <div className="space-y-3 text-left">
+            <div className="flex items-center justify-between p-3.5 rounded-xl glass border" style={{ borderColor: locationPermission === 'granted' ? 'rgba(16,185,129,0.2)' : 'var(--border)' }}>
+              <div className="flex items-center gap-3">
+                <MapPin className={`w-5 h-5 ${locationPermission === 'granted' ? 'text-emerald-400' : 'text-zinc-400'}`} />
+                <div>
+                  <p className="text-xs font-bold">Location Access</p>
+                  <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Required for GPS coordination</p>
+                </div>
+              </div>
+              <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-lg ${
+                locationPermission === 'granted' ? 'badge-resolved' : locationPermission === 'denied' ? 'badge-high' : 'badge-reported'
+              }`}>
+                {locationPermission}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between p-3.5 rounded-xl glass border" style={{ borderColor: cameraPermission === 'granted' ? 'rgba(16,185,129,0.2)' : 'var(--border)' }}>
+              <div className="flex items-center gap-3">
+                <CameraIcon className={`w-5 h-5 ${cameraPermission === 'granted' ? 'text-emerald-400' : 'text-zinc-400'}`} />
+                <div>
+                  <p className="text-xs font-bold">Camera Access</p>
+                  <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Required for AI scanner</p>
+                </div>
+              </div>
+              <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-lg ${
+                cameraPermission === 'granted' ? 'badge-resolved' : cameraPermission === 'denied' ? 'badge-high' : 'badge-reported'
+              }`}>
+                {cameraPermission}
+              </span>
+            </div>
+          </div>
+
+          {(locationPermission === 'denied' || cameraPermission === 'denied') ? (
+            <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs leading-relaxed text-left">
+              <strong>Permissions Blocked:</strong> Geolocation or camera permission is blocked. Please open your site settings (click the lock/settings icon in the browser address bar) and allow Location and Camera, then refresh the page.
+            </div>
+          ) : (
+            <button 
+              onClick={requestPermissions}
+              className="w-full btn-primary justify-center py-3.5 cursor-pointer"
+            >
+              Grant Permissions
+            </button>
+          )}
+          
+          <button onClick={handleLogout} className="text-xs font-bold transition-all text-zinc-400 hover:text-white pt-2 block mx-auto cursor-pointer">
+            Sign Out
+          </button>
+        </motion.div>
       </div>
     );
   }
