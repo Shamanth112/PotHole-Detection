@@ -35,7 +35,7 @@ export default function App() {
   const convex = useConvex();
 
   const [activeTab, setActiveTab] = useState<Tab>('home');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth >= 768);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const { potholes } = usePotholes();
   const navigate = useNavigate();
@@ -401,7 +401,7 @@ export default function App() {
               >
                 <AnimatePresence mode="wait">
                   {activeTab === 'home' && (
-                    <motion.div key="home" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }} className="h-full overflow-y-auto">
+                    <motion.div key="home" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }} className="h-full overflow-y-auto pb-32 md:pb-48">
                       <HomeView
                         userRole={user.role as any}
                         onStartDetection={() => setActiveTab('scan')}
@@ -421,7 +421,7 @@ export default function App() {
                     </motion.div>
                   )}
                   {activeTab === 'history' && (
-                    <motion.div key="history" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="h-full overflow-y-auto">
+                    <motion.div key="history" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="h-full overflow-y-auto pb-32 md:pb-48">
                       <PotholeList potholes={potholes} />
                     </motion.div>
                   )}
@@ -431,12 +431,12 @@ export default function App() {
                     </motion.div>
                   )}
                   {activeTab === 'report' && (
-                    <motion.div key="report" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 30 }} className="h-full overflow-y-auto">
+                    <motion.div key="report" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 30 }} className="h-full overflow-y-auto pb-32 md:pb-48">
                       <ReportView onBack={() => setActiveTab('home')} onSubmit={(data) => handleReportPothole(data)} userId={user._id as string} />
                     </motion.div>
                   )}
                   {activeTab === 'profile' && (
-                    <motion.div key="profile" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="h-full overflow-y-auto">
+                    <motion.div key="profile" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="h-full overflow-y-auto pb-32 md:pb-48">
                       <ProfileView user={user} potholes={potholes} onLogout={handleLogout} onPhotoUpload={handleProfilePhotoUpload} onNavigateAdmin={() => navigate('/admin')} />
                     </motion.div>
                   )}
