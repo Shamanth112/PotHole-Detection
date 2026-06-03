@@ -291,27 +291,31 @@ export default function AdminDashboard() {
               {!loading && users.length === 0 && <p className="text-center text-xs py-8" style={{ color: 'var(--text-muted)' }}>No registered users found.</p>}
               {users.map((u, i) => (
                 <div key={i} className="p-4 rounded-xl transition-all hover:bg-white/5" style={{ border: '1px solid var(--border)' }}>
-                  <div className="flex items-center gap-3">
-                    <img src={u.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || u.email || 'U')}&background=3b82f6&color=fff`}
-                      alt={u.name || u.email} className="w-11 h-11 rounded-xl object-cover shrink-0" style={{ border: '1px solid var(--border)' }} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-semibold truncate">{u.name || 'No Name'}</p>
-                        <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded ${roleBadge(u.role || 'citizen')}`}>{u.role || 'citizen'}</span>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-start gap-3 flex-1 min-w-0">
+                      <img src={u.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || u.email || 'U')}&background=3b82f6&color=fff`}
+                        alt={u.name || u.email} className="w-11 h-11 rounded-xl object-cover shrink-0" style={{ border: '1px solid var(--border)' }} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-semibold truncate">{u.name || 'No Name'}</p>
+                          <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded ${roleBadge(u.role || 'citizen')}`}>{u.role || 'citizen'}</span>
+                        </div>
+                        <p className="text-xs truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>{u.email}</p>
+                        {u._creationTime && <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>Joined {new Date(u._creationTime).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</p>}
                       </div>
-                      <p className="text-xs truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>{u.email}</p>
-                      {u._creationTime && <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>Joined {new Date(u._creationTime).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</p>}
                     </div>
-                    <div className="flex items-center gap-1 shrink-0">
+                    <div className="flex items-center gap-2 justify-end w-full sm:w-auto border-t sm:border-t-0 pt-2 sm:pt-0" style={{ borderColor: 'var(--border)' }}>
                       {editingUserId === u._id ? (
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 w-full justify-between sm:justify-start">
                           <select value={editUserRole} onChange={(e) => setEditUserRole(e.target.value)} className="input-dark py-1 text-xs w-28" style={{ background: 'rgba(0,0,0,0.5)' }}>
                             <option value="citizen">Citizen</option>
                             <option value="municipal">Municipal</option>
                             <option value="admin">Admin</option>
                           </select>
-                          <button onClick={() => handleEditUserRole(u._id as Id<"profiles">)} className="p-1.5 text-emerald-400"><Save className="w-3.5 h-3.5" /></button>
-                          <button onClick={() => setEditingUserId(null)} style={{ color: 'var(--text-muted)' }}><X className="w-3.5 h-3.5" /></button>
+                          <div className="flex gap-1">
+                            <button onClick={() => handleEditUserRole(u._id as Id<"profiles">)} className="p-1.5 text-emerald-400"><Save className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => setEditingUserId(null)} style={{ color: 'var(--text-muted)' }}><X className="w-3.5 h-3.5" /></button>
+                          </div>
                         </div>
                       ) : (
                         <>
@@ -376,8 +380,8 @@ export default function AdminDashboard() {
                         </div>
                       </div>
                     ) : (
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="flex items-start gap-3 flex-1 min-w-0">
                           <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${p.severity === 'high' ? 'badge-high' : p.severity === 'medium' ? 'badge-medium' : 'badge-low'}`}>
                             <AlertTriangle className="w-5 h-5" />
                           </div>
@@ -397,7 +401,7 @@ export default function AdminDashboard() {
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-1 shrink-0">
+                        <div className="flex items-center gap-2 justify-end w-full sm:w-auto border-t sm:border-t-0 pt-2 sm:pt-0" style={{ borderColor: 'var(--border)' }}>
                           <button onClick={() => { setEditingPotholeId(p._id); setEditPotholeData({ status: p.status, severity: p.severity, address: p.address || '' }); }} className="p-2 rounded-lg hover:bg-blue-500/10 text-blue-400"><Pencil className="w-4 h-4" /></button>
                           <button onClick={() => handleDeletePothole(p._id as any)} className="p-2 rounded-lg hover:bg-red-500/10 text-red-400"><Trash2 className="w-4 h-4" /></button>
                         </div>

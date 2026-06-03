@@ -158,14 +158,44 @@ export default function App() {
                 <div className="w-9 h-9 rounded-xl gradient-emerald flex items-center justify-center glow-green">
                   <ShieldCheck className="w-5 h-5 text-white" />
                 </div>
-                <span className="font-black text-xl tracking-tight">Admin <span style={{ color: 'var(--text-secondary)' }}>Console</span></span>
+                <span className="font-black text-lg md:text-xl tracking-tight">Admin <span className="hidden sm:inline" style={{ color: 'var(--text-secondary)' }}>Console</span></span>
               </div>
-              <button onClick={() => navigate('/')} className="flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl glass transition-all" style={{ color: 'var(--text-secondary)' }}>
-                <ArrowLeft className="w-4 h-4" /> Back to App
+              <button onClick={() => navigate('/')} className="flex items-center gap-2 text-sm font-semibold px-3 md:px-4 py-2 rounded-xl glass transition-all" style={{ color: 'var(--text-secondary)' }}>
+                <ArrowLeft className="w-4 h-4" /> <span className="hidden sm:inline">Back to App</span>
               </button>
             </header>
-            <div className="p-6 max-w-7xl mx-auto">
+            <div className="p-4 md:p-6 max-w-7xl mx-auto">
               <AdminDashboard />
+            </div>
+          </div>
+        ) : <Navigate to="/" />
+      } />
+
+      <Route path="/municipal" element={
+        user && (user.role === 'municipal' || user.role === 'admin') ? (
+          <div className="min-h-screen app-bg text-white">
+            <header className="h-16 glass-strong flex items-center justify-between px-6 sticky top-0 z-50 border-b" style={{ borderColor: 'var(--border)' }}>
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl gradient-blue flex items-center justify-center glow-blue">
+                  <ShieldAlert className="w-5 h-5 text-white" />
+                </div>
+                <span className="font-black text-lg md:text-xl tracking-tight">Municipal <span className="hidden sm:inline" style={{ color: 'var(--text-secondary)' }}>Dashboard</span></span>
+              </div>
+              <div className="flex items-center gap-3">
+                {user.role === 'admin' && (
+                  <button onClick={() => navigate('/')} className="flex items-center gap-2 text-sm font-semibold px-3 md:px-4 py-2 rounded-xl glass transition-all" style={{ color: 'var(--text-secondary)' }}>
+                    <ArrowLeft className="w-4 h-4" /> <span className="hidden sm:inline">Back to App</span>
+                  </button>
+                )}
+                <button onClick={handleLogout} className="p-2 rounded-xl glass hover:border-opacity-50 transition-all text-red-400">
+                  <LogOut className="w-5 h-5" />
+                </button>
+                <img src={user.avatarUrl || `https://ui-avatars.com/api/?name=${user.email}&background=3b82f6&color=fff`}
+                  className="w-9 h-9 rounded-xl object-cover border" style={{ borderColor: 'var(--border)' }} alt="User" />
+              </div>
+            </header>
+            <div className="p-4 md:p-6 max-w-7xl mx-auto">
+              <MunicipalDashboard potholes={potholes} />
             </div>
           </div>
         ) : <Navigate to="/" />
