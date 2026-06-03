@@ -445,7 +445,9 @@ export default function App() {
             </main>
 
             {/* ── Mobile Bottom Nav ── */}
-            <nav className="md:hidden mobile-nav">
+            <nav className={`md:hidden mobile-nav transition-transform duration-300 ${
+              isSidebarOpen ? 'translate-y-full' : 'translate-y-0'
+            }`}>
               <MobileNavBtn active={activeTab === 'home'} onClick={() => setActiveTab('home')} icon={<HomeIcon className="w-5 h-5" />} label="Home" data-tour="mobile-home" />
               <MobileNavBtn active={activeTab === 'map'}  onClick={() => setActiveTab('map')}  icon={<MapIcon  className="w-5 h-5" />} label="Map"   data-tour="mobile-map" />
 
