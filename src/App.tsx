@@ -146,16 +146,16 @@ export default function App() {
   const handleReportPothole = async (data: { latitude: number; longitude: number; severity: string; address?: string; reportImageUrl?: string; reportImageId?: string }, isAuto = false) => {
     if (!user) return;
     try {
-      await reportPotholeBase({
+      const potholeId = await reportPotholeBase({
         latitude: data.latitude, longitude: data.longitude,
         severity: data.severity as any, address: data.address,
         reportImageUrl: data.reportImageUrl, reportImageId: data.reportImageId as any,
         userName: user.name ?? 'Road Guardian',
       });
       if (!isAuto) {
-        setActiveTab('history');
         confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 }, colors: ['#3b82f6', '#06b6d4', '#10b981'] });
       }
+      return potholeId;
     } catch (error: any) {
       console.error("Error reporting pothole:", error);
       if (!isAuto) alert("Failed to submit report: " + (error?.message || JSON.stringify(error)));
@@ -620,7 +620,7 @@ export default function App() {
                   )}
                   {activeTab === 'report' && (
                     <motion.div key="report" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 30 }} className="h-full overflow-y-auto pb-32 md:pb-48">
-                      <ReportView onBack={() => setActiveTab('home')} onSubmit={(data) => handleReportPothole(data)} userId={user._id as string} />
+                      <ReportView onBack={() => setActiveTab('home')} onSubmit={(data) => handleReportPothole(data) as any} userId={user._id as string} />
                     </motion.div>
                   )}
                   {activeTab === 'profile' && (

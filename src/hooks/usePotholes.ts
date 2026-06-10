@@ -15,6 +15,12 @@ export interface Pothole {
   reportImageUrl?: string;
   resolvedImageUrl?: string;
   _creationTime: number;
+  // AI verification fields (populated after Gemini analyses the photo)
+  aiVerified?: boolean;
+  aiDepthEstimate?: string;
+  aiSeverityConfidence?: string;
+  aiDescription?: string;
+  aiAnalyzedAt?: number;
 }
 
 /**

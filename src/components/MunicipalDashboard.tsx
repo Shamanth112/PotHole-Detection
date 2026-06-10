@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Pothole } from '../hooks/usePotholes';
-import { MapPin, User, Navigation, Clock, ShieldAlert, CheckCircle2, Loader2, AlertCircle, Camera as CameraIcon, X, TrendingUp, Filter } from 'lucide-react';
+import { MapPin, User, Navigation, Clock, ShieldAlert, CheckCircle2, Loader2, AlertCircle, Camera as CameraIcon, X, TrendingUp, Filter, Brain, Ruler, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
@@ -237,6 +237,72 @@ export default function MunicipalDashboard({ potholes: propPotholes }: Municipal
                     </button>
                   ))}
                 </div>
+
+                {/* AI Analysis Card */}
+                {p.aiVerified !== undefined && (
+                  <div
+                    className="rounded-2xl overflow-hidden"
+                    style={{
+                      background: p.aiVerified
+                        ? 'rgba(16,185,129,0.06)'
+                        : 'rgba(239,68,68,0.06)',
+                      border: `1px solid ${
+                        p.aiVerified
+                          ? 'rgba(16,185,129,0.2)'
+                          : 'rgba(239,68,68,0.2)'
+                      }`,
+                    }}
+                  >
+                    <div className="px-4 py-3 flex items-center gap-2" style={{ borderBottom: `1px solid ${p.aiVerified ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)'}` }}>
+                      <Brain className={`w-3.5 h-3.5 ${p.aiVerified ? 'text-emerald-400' : 'text-red-400'}`} />
+                      <span className={`text-[10px] font-black uppercase tracking-widest ${p.aiVerified ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {p.aiVerified ? 'AI Verified ✓' : 'AI Rejected — No Pothole Detected'}
+                      </span>
+                      {p.aiAnalyzedAt && (
+                        <span className="ml-auto text-[9px]" style={{ color: 'var(--text-muted)' }}>
+                          {new Date(p.aiAnalyzedAt).toLocaleTimeString()}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="p-4 space-y-2">
+                      {/* Description */}
+                      {p.aiDescription && (
+                        <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                          {p.aiDescription}
+                        </p>
+                      )}
+
+                      {/* Depth + Severity row — only when verified */}
+                      {p.aiVerified && (
+                        <div className="flex flex-wrap gap-3 pt-1">
+                          {p.aiDepthEstimate && (
+                            <div className="flex items-center gap-1.5">
+                              <Ruler className="w-3 h-3 text-blue-400" />
+                              <span className="text-[10px] font-semibold" style={{ color: 'var(--text-muted)' }}>Depth:</span>
+                              <span className="text-[10px] font-black text-blue-400">{p.aiDepthEstimate}</span>
+                            </div>
+                          )}
+                          {p.aiSeverityConfidence && (
+                            <div className="flex items-center gap-1.5">
+                              <AlertTriangle className="w-3 h-3 text-orange-400" />
+                              <span className="text-[10px] font-semibold" style={{ color: 'var(--text-muted)' }}>Severity:</span>
+                              <span className="text-[10px] font-black text-orange-400">{p.aiSeverityConfidence}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Pending AI analysis indicator */}
+                {p.aiVerified === undefined && p.reportImageId && (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)' }}>
+                    <Loader2 className="w-3 h-3 text-blue-400 animate-spin" />
+                    <span className="text-[10px] font-semibold text-blue-400">AI analysis in progress…</span>
+                  </div>
+                )}
 
                 {/* Resolve upload form */}
                 <AnimatePresence>

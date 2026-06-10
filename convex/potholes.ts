@@ -1,6 +1,7 @@
 import { v } from "convex/values";
-import { mutation, query, MutationCtx, QueryCtx } from "./_generated/server";
+import { mutation, query, internalMutation, MutationCtx, QueryCtx } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { internal } from "./_generated/api";
 
 async function getCallerProfile(ctx: QueryCtx | MutationCtx) {
   const userId = await getAuthUserId(ctx);
@@ -43,6 +44,16 @@ export const listAll = query({
   },
 });
 
+// Get a single pothole by id — used to poll AI verification status
+export const getById = query({
+  args: { potholeId: v.id("potholes") },
+  handler: async (ctx, args) => {
+    const caller = await getCallerProfile(ctx);
+    if (!caller) return null;
+    return await ctx.db.get(args.potholeId);
+  },
+});
+
 // ─── Report a new pothole ─────────────────────────────────
 
 export const report = mutation({
@@ -61,7 +72,7 @@ export const report = mutation({
 
     console.log("[report] Inserting with userId:", caller.userId);
 
-    await ctx.db.insert("potholes", {
+    const potholeId = await ctx.db.insert("potholes", {
       userId: caller.userId,
       userName: args.userName ?? caller.name ?? "Road Guardian",
       latitude: args.latitude,
@@ -72,6 +83,16 @@ export const report = mutation({
       reportImageId: args.reportImageId,
       reportImageUrl: args.reportImageUrl,
     });
+
+    // If the report includes an image, schedule AI verification immediately.
+    if (args.reportImageId) {
+      await ctx.scheduler.runAfter(0, internal.aiVerify.verifyImage, {
+        potholeId,
+        storageId: args.reportImageId,
+      });
+    }
+
+    return potholeId;
   },
 });
 
@@ -160,5 +181,33 @@ export const addManual = mutation({
       address: args.address ?? "Manual Entry",
       status: "reported",
     });
+  },
+});
+
+// ─── Apply AI verification result (internal) ──────────────
+
+export const applyAiResult = internalMutation({
+  args: {
+    potholeId: v.id("potholes"),
+    aiVerified: v.boolean(),
+    aiDescription: v.union(v.string(), v.null()),
+    aiDepthEstimate: v.union(v.string(), v.null()),
+    aiSeverityConfidence: v.union(v.string(), v.null()),
+  },
+  handler: async (ctx, args) => {
+    const patch: Record<string, any> = {
+      aiVerified: args.aiVerified,
+      aiAnalyzedAt: Date.now(),
+      // Update status: verified if pothole detected, dismissed if rejected
+      status: args.aiVerified ? "verified" : "dismissed",
+    };
+    if (args.aiDescription !== null)       patch.aiDescription = args.aiDescription;
+    if (args.aiDepthEstimate !== null)     patch.aiDepthEstimate = args.aiDepthEstimate;
+    if (args.aiSeverityConfidence !== null) patch.aiSeverityConfidence = args.aiSeverityConfidence;
+
+    await ctx.db.patch(args.potholeId, patch);
+    console.log(
+      `[applyAiResult] potholeId=${args.potholeId} verified=${args.aiVerified} status=${patch.status}`
+    );
   },
 });

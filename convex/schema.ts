@@ -37,6 +37,12 @@ export default defineSchema({
     // We also keep raw URL fields for backwards compat / external images
     reportImageUrl: v.optional(v.string()),
     resolvedImageUrl: v.optional(v.string()),
+    // AI verification fields
+    aiVerified: v.optional(v.boolean()),          // true = pothole confirmed, false = rejected
+    aiDepthEstimate: v.optional(v.string()),       // e.g. "3–5 cm"
+    aiSeverityConfidence: v.optional(v.string()),  // e.g. "high (92%)"
+    aiDescription: v.optional(v.string()),         // free-text Gemini summary
+    aiAnalyzedAt: v.optional(v.number()),          // timestamp of analysis
   }).index("by_user", ["userId"]),
 
   permittedUsers: defineTable({
