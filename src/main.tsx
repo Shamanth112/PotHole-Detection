@@ -4,7 +4,13 @@ import { BrowserRouter } from 'react-router-dom';
 import { ConvexAuthProvider } from '@convex-dev/auth/react';
 import { ConvexReactClient } from 'convex/react';
 import App from './App.tsx';
+import { ThemeProvider } from './hooks/useTheme.tsx';
 import './index.css';
+
+// Apply persisted theme immediately to avoid flash
+const savedTheme = localStorage.getItem('rg-theme');
+const prefersDark = !savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches;
+document.documentElement.setAttribute('data-theme', savedTheme || (prefersDark ? 'dark' : 'dark'));
 
 const convexUrl = import.meta.env.VITE_CONVEX_URL as string;
 console.log("DEBUG: VITE_CONVEX_URL is:", convexUrl);
@@ -71,11 +77,13 @@ if (!convexUrl || convexUrl === 'undefined') {
   try {
     createRoot(rootElement).render(
       <ErrorBoundary>
-        <ConvexAuthProvider client={convex}>
-          <BrowserRouter>
-            <App />
-          </BrowserRouter>
-        </ConvexAuthProvider>
+        <ThemeProvider>
+          <ConvexAuthProvider client={convex}>
+            <BrowserRouter>
+              <App />
+            </BrowserRouter>
+          </ConvexAuthProvider>
+        </ThemeProvider>
       </ErrorBoundary>
     );
     console.log("DEBUG: Full app render call complete");

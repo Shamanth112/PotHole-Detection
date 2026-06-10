@@ -17,11 +17,13 @@ import {
   LayoutDashboard, Map as MapIcon, Camera as CameraIcon, LogOut, ShieldAlert,
   Activity, Settings, ShieldCheck, ArrowLeft, User as UserIcon,
   History, Scan, Home as HomeIcon, ChevronRight, Bell, Award,
-  Shield, Loader2, FileText, Zap, TrendingUp, Star, Menu, X, MapPin
+  Shield, Loader2, FileText, Zap, TrendingUp, Star, Menu, X, MapPin,
+  Sun, Moon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import confetti from 'canvas-confetti';
 import { Id } from '@/convex/_generated/dataModel';
+import { useTheme } from './hooks/useTheme';
 
 type Tab = 'home' | 'map' | 'history' | 'scan' | 'profile' | 'report';
 
@@ -39,6 +41,7 @@ export default function App() {
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const { potholes } = usePotholes();
   const navigate = useNavigate();
+  const { theme, toggleTheme, isDark } = useTheme();
 
   const [locationPermission, setLocationPermission] = useState<'prompt' | 'granted' | 'denied'>('prompt');
   const [cameraPermission, setCameraPermission] = useState<'prompt' | 'granted' | 'denied'>('prompt');
@@ -274,6 +277,7 @@ export default function App() {
             </span>
           </div>
           <div className="flex items-center gap-3">
+            <button onClick={toggleTheme} className="theme-toggle" title={isDark ? 'Switch to Light' : 'Switch to Dark'} aria-label="Toggle theme" />
             <button onClick={handleLogout} className="p-2 rounded-xl glass hover:border-opacity-50 transition-all" style={{ color: 'var(--text-secondary)' }}>
               <LogOut className="w-5 h-5" />
             </button>
@@ -448,6 +452,20 @@ export default function App() {
                 </span>
               </div>
 
+              {/* Theme toggle in sidebar */}
+              <div className="flex items-center justify-between glass rounded-xl px-3 py-2 mb-4">
+                <div className="flex items-center gap-2">
+                  {isDark ? <Moon className="w-3.5 h-3.5" style={{ color: 'var(--accent-blue)' }} /> : <Sun className="w-3.5 h-3.5 text-amber-500" />}
+                  <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>{isDark ? 'Dark Mode' : 'Light Mode'}</span>
+                </div>
+                <button
+                  onClick={toggleTheme}
+                  className="theme-toggle"
+                  title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+                  aria-label="Toggle theme"
+                />
+              </div>
+
               <p className="text-[10px] font-bold uppercase tracking-widest mb-2 px-1" style={{ color: 'var(--text-muted)' }}>Navigation</p>
 
               {/* Nav items */}
@@ -512,6 +530,7 @@ export default function App() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  <button onClick={toggleTheme} className="theme-toggle" title={isDark ? 'Switch to Light' : 'Switch to Dark'} aria-label="Toggle theme" />
                   <button className="relative p-2 rounded-xl glass" style={{ color: 'var(--text-secondary)' }}>
                     <Bell className="w-4 h-4" />
                     <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-blue-500 rounded-full" />
@@ -547,6 +566,7 @@ export default function App() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
+                  <button onClick={toggleTheme} className="theme-toggle" title={isDark ? 'Switch to Light' : 'Switch to Dark'} aria-label="Toggle theme" />
                   <button className="relative p-2 rounded-xl glass" style={{ color: 'var(--text-secondary)' }}>
                     <Bell className="w-5 h-5" />
                     <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-500 rounded-full" />
