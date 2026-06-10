@@ -179,10 +179,18 @@ export default function MunicipalDashboard({ potholes: propPotholes }: Municipal
 
                       {/* Meta tags */}
                       <div className="flex flex-wrap gap-2 mt-3">
-                        <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-mono" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>
-                          <Navigation className="w-3 h-3 text-blue-400" />
+                        <a
+                          href={`https://www.google.com/maps?q=${p.latitude},${p.longitude}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Open in Google Maps"
+                          className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-mono transition-all hover:opacity-80"
+                          style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.25)', color: '#60a5fa', textDecoration: 'none' }}
+                        >
+                          <Navigation className="w-3 h-3 text-blue-400 shrink-0" />
                           {p.latitude.toFixed(5)}, {p.longitude.toFixed(5)}
-                        </div>
+                          <span style={{ fontSize: '9px', opacity: 0.7, marginLeft: '2px' }}>↗</span>
+                        </a>
                         <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>
                           <Clock className="w-3 h-3" />
                           {new Date(p._creationTime).toLocaleString()}
