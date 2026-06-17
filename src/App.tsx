@@ -373,7 +373,7 @@ export default function App() {
                   Road<span className="gradient-text-blue">Guard</span>
                 </h1>
                 <p className="text-sm font-medium max-w-[280px] mx-auto leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                  AI Pothole Detection &amp; Road Damage Reporting — the Smart City Solution for Road Safety
+                  Pothole Detection &amp; Road Damage Reporting — AI-Powered Road Safety Platform
                 </p>
               </div>
 
@@ -404,7 +404,7 @@ export default function App() {
                   border: 0,
                 }}
               >
-                RoadGuard is an AI pothole detection and road damage reporting app — a pothole reporting app and road safety platform built as a smart city solution for real-time infrastructure monitoring.
+                RoadGuard is the best pothole detection app for AI-powered pothole detection and road damage reporting. Use our pothole reporting app for smart city infrastructure monitoring and road safety platform needs.
               </p>
 
               {/* Login card */}
