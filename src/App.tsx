@@ -372,17 +372,40 @@ export default function App() {
                 <h1 className="text-5xl font-black tracking-tight mb-2">
                   Road<span className="gradient-text-blue">Guard</span>
                 </h1>
-                <p className="text-sm font-medium max-w-[260px] mx-auto leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                  AI-Powered Pothole Detection &amp; Road Safety Management Platform
+                <p className="text-sm font-medium max-w-[280px] mx-auto leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                  AI Pothole Detection &amp; Road Damage Reporting — the Smart City Solution for Road Safety
                 </p>
               </div>
 
-              {/* Feature pills */}
-              <div className="flex justify-center gap-2 mb-10 flex-wrap">
-                {['AI Detection', 'Real-time Map', 'Civic Reports'].map((f) => (
+              {/* Feature pills — keyword-rich for SEO */}
+              <div className="flex justify-center gap-2 mb-3 flex-wrap">
+                {[
+                  'AI Pothole Detection',
+                  'Road Damage Reporting',
+                  'Smart City Solution',
+                  'Road Safety Platform',
+                  'Infrastructure Monitoring',
+                ].map((f) => (
                   <span key={f} className="glass px-3 py-1 rounded-full text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>✦ {f}</span>
                 ))}
               </div>
+              {/* Visually hidden — crawlable SEO text */}
+              <p
+                aria-hidden="false"
+                style={{
+                  position: 'absolute',
+                  width: '1px',
+                  height: '1px',
+                  padding: 0,
+                  margin: '-1px',
+                  overflow: 'hidden',
+                  clip: 'rect(0,0,0,0)',
+                  whiteSpace: 'nowrap',
+                  border: 0,
+                }}
+              >
+                RoadGuard is an AI pothole detection and road damage reporting app — a pothole reporting app and road safety platform built as a smart city solution for real-time infrastructure monitoring.
+              </p>
 
               {/* Login card */}
               <div className="glass-strong rounded-3xl p-8 space-y-4">
