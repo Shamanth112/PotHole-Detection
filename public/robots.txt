@@ -1,0 +1,13 @@
+# RoadGuard — robots.txt
+# https://potholedetection.dpdns.org/
+
+# Allow all crawlers full access
+User-agent: *
+Allow: /
+
+# Disallow authenticated/private routes
+Disallow: /api/
+Disallow: /_convex/
+
+# Sitemap location (tells Google where to find your sitemap)
+Sitemap: https://potholedetection.dpdns.org/sitemap.xml
