@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Shield, Zap, Brain, Camera, FileText, History,
   CheckCircle2, ArrowRight, ChevronLeft, ChevronRight,
-  MapPin, AlertTriangle, Star, Users, TrendingUp, Wrench
+  MapPin, AlertTriangle, Star, Wrench
 } from 'lucide-react';
 
 interface LandingPageProps {
@@ -86,12 +86,7 @@ const STEPS = [
   },
 ];
 
-const STATS = [
-  { icon: <MapPin className="w-5 h-5" />, value: '12,400+', label: 'Potholes Reported', color: 'text-blue-400' },
-  { icon: <CheckCircle2 className="w-5 h-5" />, value: '8,900+', label: 'Roads Fixed', color: 'text-emerald-400' },
-  { icon: <Users className="w-5 h-5" />, value: '3,200+', label: 'Active Citizens', color: 'text-purple-400' },
-  { icon: <TrendingUp className="w-5 h-5" />, value: '98%', label: 'AI Accuracy', color: 'text-yellow-400' },
-];
+
 
 /* ──────────────────────────────────────────────────────────────────────────── */
 export default function LandingPage({ onLogin }: LandingPageProps) {
@@ -153,7 +148,7 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
               <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
               <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
             </svg>
-            Sign in with Google
+            Continue with Google
           </button>
         </div>
       </header>
@@ -231,30 +226,10 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
             </a>
           </motion.div>
 
-          {/* Trust line */}
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
-            className="mt-4 text-xs"
-            style={{ color: 'var(--text-muted)' }}
-          >
-            Free for citizens · No credit card · Powered by Google Gemini AI
-          </motion.p>
+
         </section>
 
-        {/* ══ STATS BAR ════════════════════════════════════════════════════════ */}
-        <section aria-label="Platform statistics" className="border-y" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,0.02)' }}>
-          <div className="max-w-6xl mx-auto px-5 py-8 grid grid-cols-2 md:grid-cols-4 gap-6">
-            {STATS.map(({ icon, value, label, color }) => (
-              <div key={label} className="flex flex-col items-center text-center gap-2">
-                <div className={color}>{icon}</div>
-                <p className={`text-2xl md:text-3xl font-black ${color}`}>{value}</p>
-                <p className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>{label}</p>
-              </div>
-            ))}
-          </div>
-        </section>
+
 
         {/* ══ HOW IT WORKS — TOUR ══════════════════════════════════════════════ */}
         <section
