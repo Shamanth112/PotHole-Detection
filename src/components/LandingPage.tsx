@@ -150,10 +150,10 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const heroRef = useRef<HTMLDivElement>(null);
 
-  /* Parallax on hero scroll */
+  /* Parallax on hero scroll — gentle drift */
   const { scrollY } = useScroll();
-  const heroY = useTransform(scrollY, [0, 400], [0, -80]);
-  const heroOpacity = useTransform(scrollY, [0, 300], [1, 0.3]);
+  const heroY = useTransform(scrollY, [0, 500], [0, -50], { clamp: true });
+  const heroOpacity = useTransform(scrollY, [0, 400], [1, 0.55], { clamp: true });
 
   /* Auto-advance carousel */
   useEffect(() => {

@@ -66,7 +66,10 @@
 /* ─── Base ───────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
 
-html { scroll-behavior: smooth; }
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 72px; /* offset for sticky header */
+}
 
 /* Smooth theme transitions — only for color/background, not layout */
 body, .sidebar, .mobile-nav, .mobile-header, .glass, .glass-hover, .glass-strong,
@@ -397,6 +400,9 @@ body {
     radial-gradient(ellipse 100% 80% at 50% -20%, rgba(59,130,246,0.15) 0%, transparent 60%),
     radial-gradient(ellipse 60% 40% at 80% 100%, rgba(6,182,212,0.08) 0%, transparent 60%),
     #060b18;
+  /* Enable GPU compositing for butter-smooth scroll + framer-motion parallax */
+  will-change: scroll-position;
+  -webkit-overflow-scrolling: touch;
 }
 
 [data-theme="light"] .login-bg {
@@ -498,8 +504,8 @@ body {
 .app-bg   { min-height: 100dvh; }
 .login-bg { min-height: 100dvh; }
 
-/* Prevent iOS bounce-scroll on the shell */
-body { overscroll-behavior: none; }
+/* Prevent iOS bounce-scroll only on the main app shell, NOT the landing page */
+.app-bg { overscroll-behavior: none; }
 
 /* Clean tap behavior — remove the grey flash on press */
 *, button, a, [role="button"] { -webkit-tap-highlight-color: transparent; }
