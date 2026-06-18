@@ -28,8 +28,11 @@ export const list = query({
     }
 
     // Citizens see only their own potholes (by auth userId)
-    // For now, return all for testing
-    return await ctx.db.query("potholes").order("desc").take(100);
+    return await ctx.db
+      .query("potholes")
+      .withIndex("by_user", (q) => q.eq("userId", caller.userId))
+      .order("desc")
+      .take(100);
   },
 });
 
