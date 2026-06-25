@@ -200,9 +200,7 @@ export default function App() {
           animate={{ opacity: 1, y: 0 }} 
           className="w-full max-w-md glass-strong rounded-3xl p-8 space-y-6 text-center relative z-10 animate-float"
         >
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-500/20 text-blue-400 mb-2">
-            <Shield className="w-8 h-8 text-blue-400" />
-          </div>
+          <img src="/logo.png" alt="RoadGuard Logo" className="w-16 h-16 rounded-2xl object-cover mb-2" />
           <div>
             <h2 className="text-2xl font-black tracking-tight">Permissions Required</h2>
             <p className="text-xs mt-2 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>

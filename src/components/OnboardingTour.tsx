@@ -121,9 +121,7 @@ export default function OnboardingTour({ userName }: OnboardingTourProps) {
               exit={{ scale: 0.9, y: 20 }}
               className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl border border-white/20"
             >
-              <div className="w-16 h-16 bg-[#1a365d] rounded-2xl mx-auto flex items-center justify-center mb-6 shadow-xl">
-                <span className="text-3xl">👋</span>
-              </div>
+              <img src="/logo.png" alt="RoadGuard Logo" className="w-16 h-16 rounded-2xl object-cover mx-auto mb-6 shadow-xl" />
               <h2 className="text-2xl font-black text-[#1a365d] mb-2 tracking-tight">
                 Welcome, {userName}!
               </h2>
