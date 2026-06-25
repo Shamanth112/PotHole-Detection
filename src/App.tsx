@@ -180,10 +180,8 @@ export default function App() {
       <div className="flex items-center justify-center h-screen" style={{ background: 'var(--bg-primary)' }}>
         <div className="flex flex-col items-center gap-4">
           <div className="relative">
-            <div className="w-16 h-16 rounded-2xl gradient-blue flex items-center justify-center glow-blue">
-              <Shield className="w-8 h-8 text-white" />
-            </div>
-            <div className="absolute inset-0 rounded-2xl gradient-blue opacity-30 animate-ping" />
+            <img src="/logo.png" alt="RoadGuard Logo" className="w-16 h-16 rounded-2xl object-cover glow-blue" />
+            <div className="absolute inset-0 rounded-2xl bg-blue-500 opacity-20 animate-ping" />
           </div>
           <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>Loading RoadGuard...</p>
         </div>
@@ -269,10 +267,8 @@ export default function App() {
     return (
       <div className="min-h-screen app-bg">
         <header className="h-16 glass-strong flex items-center justify-between px-6 sticky top-0 z-50 border-b" style={{ borderColor: 'var(--border)' }}>
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl gradient-blue flex items-center justify-center glow-blue">
-              <ShieldAlert className="w-5 h-5 text-white" />
-            </div>
+          <div className="flex items-center gap-2">
+            <img src="/logo.png" alt="RoadGuard Logo" className="w-9 h-9 rounded-xl object-cover" />
             <span className="font-black text-xl tracking-tight">
               Road<span className="gradient-text-blue">Guard</span>
             </span>
@@ -297,10 +293,8 @@ export default function App() {
         user && user.role === 'admin' ? (
           <div className="min-h-screen app-bg text-white">
             <header className="h-16 glass-strong flex items-center justify-between px-6 sticky top-0 z-50 border-b" style={{ borderColor: 'var(--border)' }}>
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl gradient-emerald flex items-center justify-center glow-green">
-                  <ShieldCheck className="w-5 h-5 text-white" />
-                </div>
+              <div className="flex items-center gap-2">
+                <img src="/logo.png" alt="RoadGuard Logo" className="w-9 h-9 rounded-xl object-cover" />
                 <span className="font-black text-lg md:text-xl tracking-tight">Admin <span className="hidden sm:inline" style={{ color: 'var(--text-secondary)' }}>Console</span></span>
               </div>
               <button onClick={() => navigate('/')} className="flex items-center gap-2 text-sm font-semibold px-3 md:px-4 py-2 rounded-xl glass transition-all" style={{ color: 'var(--text-secondary)' }}>
@@ -318,10 +312,8 @@ export default function App() {
         user && (user.role === 'municipal' || user.role === 'admin') ? (
           <div className="min-h-screen app-bg text-white">
             <header className="h-16 glass-strong flex items-center justify-between px-6 sticky top-0 z-50 border-b" style={{ borderColor: 'var(--border)' }}>
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl gradient-blue flex items-center justify-center glow-blue">
-                  <ShieldAlert className="w-5 h-5 text-white" />
-                </div>
+              <div className="flex items-center gap-2">
+                <img src="/logo.png" alt="RoadGuard Logo" className="w-9 h-9 rounded-xl object-cover" />
                 <span className="font-black text-lg md:text-xl tracking-tight">Municipal <span className="hidden sm:inline" style={{ color: 'var(--text-secondary)' }}>Dashboard</span></span>
               </div>
               <div className="flex items-center gap-3">
@@ -366,10 +358,8 @@ export default function App() {
             <aside className={`sidebar ${isSidebarOpen ? 'open' : ''} flex flex-col`}>
               {/* Brand */}
               <div className="flex items-center justify-between mb-5">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl gradient-blue flex items-center justify-center glow-blue">
-                    <Shield className="w-5 h-5 text-white" />
-                  </div>
+                <div className="flex items-center gap-2.5">
+                  <img src="/logo.png" alt="RoadGuard Logo" className="w-10 h-10 rounded-xl object-cover" />
                   <div>
                     <span className="font-black text-lg tracking-tight">Road<span className="gradient-text-blue">Guard</span></span>
                     <p className="text-[10px] font-medium uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>AI Platform</p>
@@ -461,9 +451,7 @@ export default function App() {
                   >
                     <Menu className="w-4.5 h-4.5" />
                   </button>
-                  <div className="w-8 h-8 rounded-xl gradient-blue flex items-center justify-center">
-                    <Shield className="w-4 h-4 text-white" />
-                  </div>
+                  <img src="/logo.png" alt="RoadGuard Logo" className="w-8 h-8 rounded-xl object-cover" />
                   <div>
                     <p className="font-black text-sm leading-tight">
                       {activeTab === 'home' ? 'Dashboard' : activeTab === 'scan' ? 'AI Scanner' : activeTab === 'report' ? 'Report' : activeTab === 'map' ? 'Live Map' : activeTab === 'history' ? 'History' : 'Profile'}

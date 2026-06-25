@@ -206,10 +206,8 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
         transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
       >
         <div className="max-w-6xl mx-auto px-5 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl gradient-blue flex items-center justify-center glow-blue">
-              <Shield className="w-5 h-5 text-white" />
-            </div>
+          <div className="flex items-center gap-2">
+            <img src="/logo.png" alt="RoadGuard Logo" className="w-9 h-9 rounded-xl object-cover" />
             <span className="font-black text-xl tracking-tight">
               Road<span className="gradient-text-blue">Guard</span>
             </span>
@@ -602,12 +600,9 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                 <motion.div
                   animate={{ y: [0, -8, 0] }}
                   transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-                  className="inline-flex items-center justify-center w-20 h-20 rounded-3xl gradient-blue glow-blue mb-6 relative mx-auto"
+                  className="inline-flex items-center justify-center mb-6 relative mx-auto"
                 >
-                  <Shield className="w-10 h-10 text-white" />
-                  <div className="absolute -top-1 -right-1 w-6 h-6 rounded-lg gradient-cyan flex items-center justify-center">
-                    <Zap className="w-3 h-3 text-white" />
-                  </div>
+                  <img src="/logo.png" alt="RoadGuard Logo" className="w-24 h-24 rounded-3xl object-cover glow-blue" />
                 </motion.div>
 
                 <h2 id="cta-heading" className="text-3xl md:text-4xl font-black tracking-tight mb-4">
@@ -648,10 +643,8 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
       <Reveal direction="up">
         <footer className="border-t py-8" style={{ borderColor: 'var(--border)', background: 'rgba(0,0,0,0.2)' }}>
           <div className="max-w-6xl mx-auto px-5 flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-7 h-7 rounded-lg gradient-blue flex items-center justify-center">
-                <Shield className="w-4 h-4 text-white" />
-              </div>
+            <div className="flex items-center gap-2">
+              <img src="/logo.png" alt="RoadGuard Logo" className="w-7 h-7 rounded-lg object-cover" />
               <span className="font-black text-sm">Road<span className="gradient-text-blue">Guard</span></span>
             </div>
             <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>
