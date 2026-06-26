@@ -52,13 +52,13 @@ if (!convexUrl || convexUrl === 'undefined') {
       super(props); 
       this.state = { hasError: false, error: null }; 
     }
-    static getDerivedStateFromError(error: any) { 
-      return { hasError: true, error }; 
+    static getDerivedStateFromError(error: any) {
+      return { hasError: true, error };
     }
-    componentDidCatch(error: any, errorInfo: any) { 
-      console.error("REACT BOUNDARY CAUGHT:", error, errorInfo); 
+    override componentDidCatch(error: any, errorInfo: any) {
+      console.error("REACT BOUNDARY CAUGHT:", error, errorInfo);
     }
-    render() {
+    override render() {
       if (this.state.hasError) {
         return (
           <div style={{ padding: '40px', background: 'white', color: 'red', border: '10px solid red', zIndex: 9999, position: 'relative' }}>

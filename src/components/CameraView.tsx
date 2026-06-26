@@ -6,23 +6,13 @@ import { motion, AnimatePresence } from 'motion/react';
 import { uploadToConvex } from '../services/storageService';
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
+import { haversineMetres } from '../utils/geo';
 
 interface CameraViewProps {
   onDetection: (detection: Detection, imageUrl: string, storageId: string) => void;
   onBack: () => void;
   gpsActive: boolean;
   userLocation: { lat: number; lng: number } | null;
-}
-
-// Haversine distance in metres between two GPS points
-function haversineMetres(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
-  const R = 6371000;
-  const dLat = (b.lat - a.lat) * Math.PI / 180;
-  const dLng = (b.lng - a.lng) * Math.PI / 180;
-  const sinLat = Math.sin(dLat / 2);
-  const sinLng = Math.sin(dLng / 2);
-  const c = sinLat * sinLat + Math.cos(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180) * sinLng * sinLng;
-  return R * 2 * Math.atan2(Math.sqrt(c), Math.sqrt(1 - c));
 }
 
 const MIN_REPORT_DISTANCE_M = 25; // Don't re-report within 25 m of a previous report
@@ -220,7 +210,7 @@ export default function CameraView({ onDetection, onBack, gpsActive, userLocatio
               if (!tooClose) {
                 lastDetectionTime.current = t;
                 if (loc) lastReportLocations.current.push({ lat: loc.lat, lng: loc.lng });
-                if (captureAndReportRef.current) captureAndReportRef.current(filtered[0]);
+                if (captureAndReportRef.current) captureAndReportRef.current(filtered[0]!);
               }
             }
           }
@@ -292,22 +282,61 @@ export default function CameraView({ onDetection, onBack, gpsActive, userLocatio
   // ── Error screen ──────────────────────────────────────────────────────────
   if (modelStatus === 'error') {
     return (
-      <div className="relative w-full h-full bg-zinc-950 rounded-2xl border border-zinc-800 flex flex-col items-center justify-center p-8 gap-6">
-        <div className="w-16 h-16 bg-amber-500/10 rounded-2xl flex items-center justify-center border border-amber-500/20">
-          <PackageOpen className="w-8 h-8 text-amber-500" />
+      <div
+        className="relative w-full h-full bg-zinc-950 rounded-2xl border border-zinc-800 flex flex-col items-center justify-center p-8 gap-6"
+        role="alert"
+        aria-live="assertive"
+      >
+        <div className="w-20 h-20 bg-amber-500/10 rounded-3xl flex items-center justify-center border border-amber-500/20">
+          <PackageOpen className="w-10 h-10 text-amber-500" aria-hidden="true" />
         </div>
-        <div className="text-center max-w-sm">
-          <h3 className="text-white font-black text-lg uppercase tracking-tight mb-2">YOLO Model Not Found</h3>
-          <p className="text-zinc-400 text-xs leading-relaxed mb-4">
-            Place your exported <span className="text-white font-mono">best.onnx</span> in the <span className="text-white font-mono">public/</span> folder and set <span className="text-white font-mono">VITE_MODEL_URL=/best.onnx</span> in <span className="text-white font-mono">.env</span>.
+        <div className="text-center max-w-md">
+          <h3 className="text-white font-black text-xl uppercase tracking-tight mb-2">
+            AI Scanner Unavailable
+          </h3>
+          <p className="text-zinc-300 text-sm leading-relaxed mb-5">
+            The pothole detection model couldn't be loaded. You can still file
+            pothole reports manually — or place the model file to enable
+            real-time scanning.
           </p>
-          <div className="bg-black rounded-xl p-4 text-left border border-zinc-800">
-            <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2">Export Command</p>
-            <p className="text-emerald-400 font-mono text-xs">yolo export model=best.pt \</p>
-            <p className="text-emerald-400 font-mono text-xs pl-4">format=onnx imgsz=640</p>
+          <div className="bg-black/60 rounded-xl p-4 text-left border border-zinc-800">
+            <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2">
+              To enable the AI scanner
+            </p>
+            <ol className="text-zinc-300 text-xs space-y-1.5 list-decimal list-inside">
+              <li>
+                Export your model:{' '}
+                <code className="text-emerald-400 font-mono">
+                  yolo export model=best.pt format=onnx imgsz=640
+                </code>
+              </li>
+              <li>
+                Place{' '}
+                <code className="text-white font-mono">best.onnx</code> in the{' '}
+                <code className="text-white font-mono">public/</code> folder
+              </li>
+              <li>
+                Add{' '}
+                <code className="text-white font-mono">
+                  VITE_MODEL_URL=/best.onnx
+                </code>{' '}
+                to your <code className="text-white font-mono">.env</code>
+              </li>
+              <li>Click Retry below</li>
+            </ol>
           </div>
         </div>
-        <div className="flex gap-3">
+        {modelErrorMsg && (
+          <details className="text-zinc-500 text-[10px] max-w-md w-full">
+            <summary className="cursor-pointer hover:text-zinc-300 transition-colors">
+              Show technical details
+            </summary>
+            <p className="font-mono mt-2 break-all whitespace-pre-wrap text-red-400/70">
+              {modelErrorMsg}
+            </p>
+          </details>
+        )}
+        <div className="flex flex-wrap gap-3 justify-center">
           <button
             onClick={() => {
               resetModel();
@@ -318,16 +347,34 @@ export default function CameraView({ onDetection, onBack, gpsActive, userLocatio
                 .catch(err => { setModelErrorMsg(err?.message || String(err)); setModelStatus('error'); });
             }}
             className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-bold transition-all"
+            aria-label="Retry loading the AI model"
           >
-            <Zap className="w-4 h-4" /> Retry
+            <Zap className="w-4 h-4" aria-hidden="true" /> Retry
           </button>
-          <button onClick={onBack} className="flex items-center gap-2 px-6 py-3 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-sm font-bold transition-all">
-            <ArrowLeft className="w-4 h-4" /> Go Back
+          <button
+            onClick={() => onDetection(
+              // Synthetic detection so the parent flows into ReportView with
+              // the still-running video frame as the photo source.
+              {
+                bbox: [0, 0, videoRef.current?.videoWidth || 640, videoRef.current?.videoHeight || 480],
+                class: 'pothole',
+                score: 0.5,
+              },
+              '',
+              '',
+            )}
+            className="flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-bold transition-all"
+          >
+            <Camera className="w-4 h-4" aria-hidden="true" /> Continue without AI
+          </button>
+          <button
+            onClick={onBack}
+            className="flex items-center gap-2 px-6 py-3 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-sm font-bold transition-all"
+            aria-label="Go back to the dashboard"
+          >
+            <ArrowLeft className="w-4 h-4" aria-hidden="true" /> Back
           </button>
         </div>
-        {modelErrorMsg && (
-          <p className="text-red-400/60 text-[10px] font-mono max-w-sm text-center break-all">{modelErrorMsg}</p>
-        )}
       </div>
     );
   }

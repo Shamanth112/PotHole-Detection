@@ -2,6 +2,7 @@
 import { v } from "convex/values";
 import { internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { parseAiResponse, looksLikePothole } from "./aiParse";
 
 const MAX_RETRIES = 3;
 // Backoff delays in ms: 1st retry after 8s, 2nd after 20s, 3rd after 45s
@@ -44,7 +45,7 @@ export const verifyImage = internalAction({
       const buffer = await imgResponse.arrayBuffer();
       imageBase64 = Buffer.from(buffer).toString("base64");
       const ct = imgResponse.headers.get("content-type") || "image/jpeg";
-      mimeType = ct.startsWith("image/") ? ct.split(";")[0].trim() : "image/jpeg";
+      mimeType = ct.startsWith("image/") ? ct.split(";")[0]!.trim() : "image/jpeg";
       console.log(`[aiVerify] Image fetched: ${buffer.byteLength} bytes, mime=${mimeType}, attempt=${attempt}`);
     } catch (err: any) {
       console.error("[aiVerify] Image download failed:", err.message);
@@ -170,29 +171,16 @@ Rules:
       return;
     }
 
-    let result: {
-      isPothole: boolean;
-      confidence: number;
-      depthEstimate: string | null;
-      severityConfidence: string | null;
-      description: string;
-    };
+    const result = parseAiResponse(rawText);
 
-    try {
-      const cleaned = rawText
-        .replace(/^```(?:json)?\s*/i, "")
-        .replace(/\s*```\s*$/, "")
-        .trim();
-      result = JSON.parse(cleaned);
-    } catch {
-      // Keyword heuristic fallback
-      const lower = rawText.toLowerCase();
-      const likelyPothole =
-        lower.includes('"ispothole":true') ||
-        lower.includes('"ispothole": true') ||
-        (lower.includes("pothole") && !lower.includes("no pothole") && !lower.includes('"ispothole":false'));
-
-      console.warn("[aiVerify] JSON parse failed, using heuristic. likelyPothole=", likelyPothole);
+    if (!result) {
+      // JSON parse failed and the response doesn't look structured — try
+      // a keyword heuristic so we still write *something* useful.
+      const likelyPothole = looksLikePothole(rawText);
+      console.warn(
+        "[aiVerify] JSON parse failed, using heuristic. likelyPothole=",
+        likelyPothole
+      );
       await ctx.runMutation(internal.potholes.applyAiResult, {
         potholeId: args.potholeId,
         aiVerified: likelyPothole,
@@ -212,9 +200,9 @@ Rules:
     await ctx.runMutation(internal.potholes.applyAiResult, {
       potholeId: args.potholeId,
       aiVerified: result.isPothole === true,
-      aiDescription: result.description ?? null,
-      aiDepthEstimate: result.depthEstimate ?? null,
-      aiSeverityConfidence: result.severityConfidence ?? null,
+      aiDescription: result.description,
+      aiDepthEstimate: result.depthEstimate,
+      aiSeverityConfidence: result.severityConfidence,
     });
   },
 });

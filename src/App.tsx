@@ -273,8 +273,8 @@ export default function App() {
           </div>
           <div className="flex items-center gap-3">
             <button onClick={toggleTheme} className="theme-toggle" title={isDark ? 'Switch to Light' : 'Switch to Dark'} aria-label="Toggle theme" />
-            <button onClick={handleLogout} className="p-2 rounded-xl glass hover:border-opacity-50 transition-all" style={{ color: 'var(--text-secondary)' }}>
-              <LogOut className="w-5 h-5" />
+            <button onClick={handleLogout} className="p-2 rounded-xl glass hover:border-opacity-50 transition-all" style={{ color: 'var(--text-secondary)' }} aria-label="Sign out">
+              <LogOut className="w-5 h-5" aria-hidden="true" />
             </button>
             <img src={user.avatarUrl || `https://ui-avatars.com/api/?name=${user.email}&background=3b82f6&color=fff`}
               className="w-9 h-9 rounded-xl object-cover border" style={{ borderColor: 'var(--border)' }} alt="User" />
@@ -320,8 +320,8 @@ export default function App() {
                     <ArrowLeft className="w-4 h-4" /> <span className="hidden sm:inline">Back to App</span>
                   </button>
                 )}
-                <button onClick={handleLogout} className="p-2 rounded-xl glass hover:border-opacity-50 transition-all text-red-400">
-                  <LogOut className="w-5 h-5" />
+                <button onClick={handleLogout} className="p-2 rounded-xl glass hover:border-opacity-50 transition-all text-red-400" aria-label="Sign out">
+                  <LogOut className="w-5 h-5" aria-hidden="true" />
                 </button>
                 <img src={user.avatarUrl || `https://ui-avatars.com/api/?name=${user.email}&background=3b82f6&color=fff`}
                   className="w-9 h-9 rounded-xl object-cover border" style={{ borderColor: 'var(--border)' }} alt="User" />
@@ -363,11 +363,12 @@ export default function App() {
                     <p className="text-[10px] font-medium uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>AI Platform</p>
                   </div>
                 </div>
-                <button 
-                  onClick={() => setIsSidebarOpen(false)} 
+                <button
+                  onClick={() => setIsSidebarOpen(false)}
                   className="p-1.5 rounded-lg glass text-zinc-400 hover:text-white transition-all md:hidden"
+                  aria-label="Close sidebar"
                 >
-                  <X className="w-4.5 h-4.5" />
+                  <X className="w-4.5 h-4.5" aria-hidden="true" />
                 </button>
               </div>
 
@@ -443,11 +444,12 @@ export default function App() {
               {/* ── Mobile Top App-Bar (hidden on md+) ── */}
               <div className="mobile-header md:hidden">
                 <div className="flex items-center gap-2.5">
-                  <button 
-                    onClick={() => setIsSidebarOpen(true)} 
+                  <button
+                    onClick={() => setIsSidebarOpen(true)}
                     className="p-1.5 rounded-lg glass text-zinc-300 hover:text-white mr-1"
+                    aria-label="Open sidebar"
                   >
-                    <Menu className="w-4.5 h-4.5" />
+                    <Menu className="w-4.5 h-4.5" aria-hidden="true" />
                   </button>
                   <img src="/logo.png" alt="RoadGuard Logo" className="w-8 h-8 rounded-xl object-cover" />
                   <div>
@@ -459,9 +461,9 @@ export default function App() {
                 </div>
                 <div className="flex items-center gap-2">
                   <button onClick={toggleTheme} className="theme-toggle" title={isDark ? 'Switch to Light' : 'Switch to Dark'} aria-label="Toggle theme" />
-                  <button className="relative p-2 rounded-xl glass" style={{ color: 'var(--text-secondary)' }}>
-                    <Bell className="w-4 h-4" />
-                    <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-blue-500 rounded-full" />
+                  <button className="relative p-2 rounded-xl glass" style={{ color: 'var(--text-secondary)' }} aria-label="Notifications">
+                    <Bell className="w-4 h-4" aria-hidden="true" />
+                    <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-blue-500 rounded-full" aria-hidden="true" />
                   </button>
                   <img
                     src={user.avatarUrl || `https://ui-avatars.com/api/?name=${user.email}&background=3b82f6&color=fff`}
@@ -482,11 +484,12 @@ export default function App() {
                 }}
               >
                 <div className="flex items-center gap-3">
-                  <button 
-                    onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
+                  <button
+                    onClick={() => setIsSidebarOpen(!isSidebarOpen)}
                     className="p-2 rounded-xl glass hover:bg-white/5 transition-all text-zinc-300 hover:text-white"
+                    aria-label={isSidebarOpen ? 'Close sidebar' : 'Open sidebar'}
                   >
-                    <Menu className="w-4.5 h-4.5" />
+                    <Menu className="w-4.5 h-4.5" aria-hidden="true" />
                   </button>
                   <div>
                     <h2 className="font-bold text-base capitalize">{activeTab === 'home' ? 'Dashboard' : activeTab === 'scan' ? 'AI Scanner' : activeTab.replace('-', ' ')}</h2>
@@ -495,8 +498,8 @@ export default function App() {
                 </div>
                 <div className="flex items-center gap-3">
                   <button onClick={toggleTheme} className="theme-toggle" title={isDark ? 'Switch to Light' : 'Switch to Dark'} aria-label="Toggle theme" />
-                  <button className="relative p-2 rounded-xl glass" style={{ color: 'var(--text-secondary)' }}>
-                    <Bell className="w-5 h-5" />
+                  <button className="relative p-2 rounded-xl glass" style={{ color: 'var(--text-secondary)' }} aria-label="Notifications">
+                    <Bell className="w-5 h-5" aria-hidden="true" />
                     <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-500 rounded-full" />
                   </button>
                   <img src={user.avatarUrl || `https://ui-avatars.com/api/?name=${user.email}&background=3b82f6&color=fff`}

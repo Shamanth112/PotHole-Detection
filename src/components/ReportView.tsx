@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Upload, MapPin, CheckCircle2, AlertTriangle, Info, ArrowLeft, Loader2, X, Brain, Ruler, XCircle } from 'lucide-react';
+import { Upload, MapPin, CheckCircle2, AlertTriangle, Info, ArrowLeft, Loader2, X, Brain, Ruler, XCircle, Share2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useConvex, useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
@@ -14,6 +14,23 @@ interface ReportViewProps {
 }
 
 // ── AI Status Screen ───────────────────────────────────────────────────────────
+
+/** Build a shareable plain-text summary of a verified report. */
+function buildShareText(pothole: { latitude: number; longitude: number; severity: string; address?: string | null; aiDescription?: string | null; aiDepthEstimate?: string | null }): string {
+  const lines = [
+    '🛣️ I just reported a pothole with RoadGuard!',
+    '',
+    `📍 Location: ${pothole.address ?? `${pothole.latitude.toFixed(4)}, ${pothole.longitude.toFixed(4)}`}`,
+    `⚠️ Severity: ${pothole.severity}`,
+  ];
+  if (pothole.aiDepthEstimate) lines.push(`📏 Estimated depth: ${pothole.aiDepthEstimate}`);
+  if (pothole.aiDescription) lines.push(`🤖 AI says: ${pothole.aiDescription}`);
+  lines.push('', 'Help keep our roads safe — download RoadGuard today!');
+  return lines.join('\n');
+}
+
+const AI_TIMEOUT_MS = 30_000;
+
 function AiStatusScreen({
   potholeId,
   onDone,
@@ -24,14 +41,45 @@ function AiStatusScreen({
   onBack: () => void;
 }) {
   const pothole = useQuery(api.potholes.getById, { potholeId });
+  const [shareStatus, setShareStatus] = useState<'idle' | 'shared' | 'failed'>('idle');
 
   // aiVerified is undefined while pending, true when verified, false when dismissed
   const pending = pothole?.aiVerified === undefined || pothole?.aiVerified === null;
   const verified = pothole?.aiVerified === true;
   const rejected = pothole?.aiVerified === false;
 
+  // After 30s of pending, show a slower-loading message so users don't
+  // think the app is broken (Gemini can take a while when the free tier
+  // is busy).
+  const [slowLoad, setSlowLoad] = useState(false);
+  useEffect(() => {
+    if (!pending) { setSlowLoad(false); return; }
+    const t = window.setTimeout(() => setSlowLoad(true), AI_TIMEOUT_MS);
+    return () => window.clearTimeout(t);
+  }, [pending]);
+
+  const handleShare = async () => {
+    if (!pothole) return;
+    const text = buildShareText(pothole);
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'Pothole reported with RoadGuard', text });
+        setShareStatus('shared');
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(text);
+        setShareStatus('shared');
+      } else {
+        setShareStatus('failed');
+      }
+    } catch {
+      setShareStatus('failed');
+    }
+    // Reset the toast after a few seconds
+    window.setTimeout(() => setShareStatus('idle'), 2500);
+  };
+
   return (
-    <div className="min-h-full flex flex-col items-center justify-center p-6 max-w-md mx-auto w-full gap-6">
+    <div className="min-h-full flex flex-col items-center justify-center p-6 max-w-md mx-auto w-full gap-6" role="status" aria-live="polite">
       <AnimatePresence mode="wait">
         {pending && (
           <motion.div
@@ -44,20 +92,32 @@ function AiStatusScreen({
             {/* Animated brain */}
             <div className="relative">
               <div className="w-20 h-20 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)' }}>
-                <Brain className="w-10 h-10 text-blue-400" />
+                <Brain className="w-10 h-10 text-blue-400" aria-hidden="true" />
               </div>
               <div className="absolute inset-0 rounded-2xl animate-ping" style={{ background: 'rgba(59,130,246,0.1)' }} />
             </div>
             <div>
               <h2 className="text-xl font-black tracking-tight">AI Verifying…</h2>
               <p className="text-sm mt-2 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                Gemini Vision is analysing your photo to confirm the pothole and estimate its depth. This usually takes a few seconds.
+                {slowLoad
+                  ? 'The AI is taking longer than usual. Your report has been saved — feel free to come back in a few minutes, we\'ll have an answer waiting for you.'
+                  : 'Gemini Vision is analysing your photo to confirm the pothole and estimate its depth. This usually takes a few seconds.'}
               </p>
             </div>
             <div className="flex items-center gap-2 px-4 py-2 rounded-xl" style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)' }}>
-              <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
-              <span className="text-xs font-semibold text-blue-400">Analysis in progress</span>
+              <Loader2 className="w-4 h-4 text-blue-400 animate-spin" aria-hidden="true" />
+              <span className="text-xs font-semibold text-blue-400">
+                {slowLoad ? 'Still working…' : 'Analysis in progress'}
+              </span>
             </div>
+            {slowLoad && (
+              <button
+                onClick={onBack}
+                className="text-xs font-bold text-blue-300 hover:text-blue-200 underline-offset-2 hover:underline"
+              >
+                Got it — check later
+              </button>
+            )}
           </motion.div>
         )}
 
@@ -110,13 +170,28 @@ function AiStatusScreen({
               </div>
             </div>
 
-            <button
-              onClick={onDone}
-              className="w-full py-3.5 rounded-2xl font-black text-white text-sm"
-              style={{ background: 'linear-gradient(135deg, #10b981, #059669)', boxShadow: '0 8px 24px rgba(16,185,129,0.3)' }}
-            >
-              Done
-            </button>
+            <div className="w-full flex gap-3">
+              <button
+                onClick={handleShare}
+                className="flex-1 py-3.5 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-all"
+                style={{
+                  background: 'rgba(59,130,246,0.1)',
+                  border: '1px solid rgba(59,130,246,0.3)',
+                  color: '#60a5fa',
+                }}
+                aria-label="Share this pothole report"
+              >
+                <Share2 className="w-4 h-4" aria-hidden="true" />
+                {shareStatus === 'shared' ? 'Copied!' : shareStatus === 'failed' ? 'Try again' : 'Share'}
+              </button>
+              <button
+                onClick={onDone}
+                className="flex-1 py-3.5 rounded-2xl font-black text-white text-sm"
+                style={{ background: 'linear-gradient(135deg, #10b981, #059669)', boxShadow: '0 8px 24px rgba(16,185,129,0.3)' }}
+              >
+                Done
+              </button>
+            </div>
           </motion.div>
         )}
 

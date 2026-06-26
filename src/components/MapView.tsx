@@ -193,9 +193,43 @@ export default function MapView({ potholes, onAddReport }: MapViewProps) {
             onClick={onAddReport}
             className="absolute bottom-20 md:bottom-6 right-4 z-10 w-14 h-14 rounded-2xl flex items-center justify-center text-white"
             style={{ background: 'linear-gradient(135deg, #3b82f6, #06b6d4)', boxShadow: '0 8px 24px rgba(59,130,246,0.45)' }}
+            aria-label="Report a new pothole"
           >
-            <Plus className="w-7 h-7" />
+            <Plus className="w-7 h-7" aria-hidden="true" />
           </motion.button>
+        )}
+
+        {/* Empty state overlay — shown when no markers match the current filter */}
+        {filteredPotholes.length === 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+            className="absolute inset-0 z-10 flex items-center justify-center p-6 pointer-events-none"
+          >
+            <div className="glass-strong rounded-3xl p-8 max-w-xs text-center pointer-events-auto" role="status">
+              <div className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center" style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.25)' }}>
+                <MapPin className="w-8 h-8 text-blue-400" aria-hidden="true" />
+              </div>
+              <h3 className="text-base font-black tracking-tight mb-2">
+                {potholes.length === 0 ? 'No reports nearby' : 'No matches for this filter'}
+              </h3>
+              <p className="text-xs leading-relaxed mb-4" style={{ color: 'var(--text-muted)' }}>
+                {potholes.length === 0
+                  ? "Looks like your area hasn't been mapped yet. Be the first to spot a pothole."
+                  : 'Try a different severity filter or zoom out to see more reports.'}
+              </p>
+              {potholes.length === 0 && onAddReport && (
+                <button
+                  onClick={onAddReport}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" aria-hidden="true" />
+                  Report first pothole
+                </button>
+              )}
+            </div>
+          </motion.div>
         )}
       </div>
     </div>

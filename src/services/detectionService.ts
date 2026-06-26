@@ -88,7 +88,7 @@ export async function loadModel(): Promise<void> {
       const dummyData = new Float32Array(1 * 3 * INPUT_SIZE * INPUT_SIZE);
       const dummyTensor = new ort.Tensor('float32', dummyData, [1, 3, INPUT_SIZE, INPUT_SIZE]);
       const feeds: Record<string, ort.Tensor> = {};
-      feeds[session.inputNames[0]] = dummyTensor;
+      feeds[session.inputNames[0]!] = dummyTensor;
       await session.run(feeds);
       console.log('[YOLO] Warmup inference complete — model is hot.');
     } catch (warmupErr) {
@@ -157,16 +157,18 @@ function letterboxImage(
   const tensor = new Float32Array(3 * targetSize * targetSize);
   const stride = targetSize * targetSize;
   for (let i = 0; i < stride; i++) {
-    tensor[i]            = pixels[i * 4]     / 255; // R
-    tensor[stride + i]   = pixels[i * 4 + 1] / 255; // G
-    tensor[2 * stride + i] = pixels[i * 4 + 2] / 255; // B
+    tensor[i]            = pixels[i * 4]!     / 255; // R
+    tensor[stride + i]   = pixels[i * 4 + 1]! / 255; // G
+    tensor[2 * stride + i] = pixels[i * 4 + 2]! / 255; // B
   }
 
   return { tensor, scaleX: scale, scaleY: scale, padX, padY };
 }
 
 // ── NMS (IoU based) ───────────────────────────────────────────────────────────
-function iou(a: number[], b: number[]) {
+type Box = readonly [number, number, number, number];
+
+export function iou(a: Box, b: Box): number {
   // a, b: [x1, y1, x2, y2]
   const ix1 = Math.max(a[0], b[0]);
   const iy1 = Math.max(a[1], b[1]);
@@ -178,15 +180,15 @@ function iou(a: number[], b: number[]) {
   return inter / (aArea + bArea - inter + 1e-6);
 }
 
-function nms(boxes: number[][], scores: number[], iouThresh: number): number[] {
-  const order = scores.map((_, i) => i).sort((a, b) => scores[b] - scores[a]);
+export function nms(boxes: Box[], scores: readonly number[], iouThresh: number): number[] {
+  const order = scores.map((_, i) => i).sort((a, b) => scores[b]! - scores[a]!);
   const keep: number[] = [];
   const suppressed = new Set<number>();
   for (const i of order) {
     if (suppressed.has(i)) continue;
     keep.push(i);
     for (const j of order) {
-      if (i !== j && !suppressed.has(j) && iou(boxes[i], boxes[j]) > iouThresh) {
+      if (i !== j && !suppressed.has(j) && iou(boxes[i]!, boxes[j]!) > iouThresh) {
         suppressed.add(j);
       }
     }
@@ -214,7 +216,7 @@ export async function detectPotholes(video: HTMLVideoElement): Promise<Detection
 
   // ── Inference ──
   const feeds: Record<string, ort.Tensor> = {};
-  feeds[session.inputNames[0]] = inputTensor;
+  feeds[session.inputNames[0]!] = inputTensor;
 
   let outputData: Float32Array;
   let numDetections: number;
@@ -222,7 +224,7 @@ export async function detectPotholes(video: HTMLVideoElement): Promise<Detection
 
   try {
     const results = await session.run(feeds);
-    const output = results[session.outputNames[0]];
+    const output = results[session.outputNames[0]!]!;
     const rawData = output.data as Float32Array;
     const dims = output.dims; // e.g. [1, 5, 8400] or [1, 8400, 5]
 
@@ -234,15 +236,15 @@ export async function detectPotholes(video: HTMLVideoElement): Promise<Detection
     // Auto-detect output layout:
     //   YOLOv8 default: [1, 4+nc, N]  (dims[1] small, dims[2] large)
     //   YOLOv5 / some exports: [1, N, 4+nc]  (dims[1] large, dims[2] small)
-    if (dims.length === 3 && dims[1] > dims[2]) {
+    if (dims.length === 3 && dims[1]! > dims[2]!) {
       // Likely [1, N, 4+nc] → transpose to [1, 4+nc, N]
-      const rows = dims[1]; // N (e.g. 8400)
-      const cols = dims[2]; // 4+nc (e.g. 5)
+      const rows = dims[1]!; // N (e.g. 8400)
+      const cols = dims[2]!; // 4+nc (e.g. 5)
       console.log(`[YOLO] Detected NON-transposed layout [1, ${rows}, ${cols}] → transposing to [1, ${cols}, ${rows}]`);
       outputData = new Float32Array(rawData.length);
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
-          outputData[c * rows + r] = rawData[r * cols + c];
+          outputData[c * rows + r] = rawData[r * cols + c]!;
         }
       }
       numDetections = rows;
@@ -250,8 +252,8 @@ export async function detectPotholes(video: HTMLVideoElement): Promise<Detection
     } else {
       // Already [1, 4+nc, N] (YOLOv8 default)
       outputData = rawData;
-      numDetections = dims[2];  // N anchor candidates
-      numClasses = dims[1] - 4; // subtract 4 bbox params
+      numDetections = dims[2]!;  // N anchor candidates
+      numClasses = dims[1]! - 4; // subtract 4 bbox params
     }
 
     if (numClasses <= 0) {
@@ -264,15 +266,15 @@ export async function detectPotholes(video: HTMLVideoElement): Promise<Detection
   }
 
   // ── Decode & filter ──
-  const rawBoxes: number[][] = [];
+  const rawBoxes: Box[] = [];
   const rawScores: number[] = [];
 
   for (let i = 0; i < numDetections; i++) {
     // YOLOv8 default ONNX export layout: [cx, cy, w, h, cls0, cls1, ...]
-    const cx = outputData[0 * numDetections + i];
-    const cy = outputData[1 * numDetections + i];
-    const w  = outputData[2 * numDetections + i];
-    const h  = outputData[3 * numDetections + i];
+    const cx = outputData[0 * numDetections + i]!;
+    const cy = outputData[1 * numDetections + i]!;
+    const w  = outputData[2 * numDetections + i]!;
+    const h  = outputData[3 * numDetections + i]!;
 
     // Get class score for pothole class
     let maxScore = 0;
@@ -280,12 +282,12 @@ export async function detectPotholes(video: HTMLVideoElement): Promise<Detection
 
     if (numClasses === 1) {
       // Single-class model: directly use class 0
-      maxScore = outputData[4 * numDetections + i];
+      maxScore = outputData[4 * numDetections + i]!;
       maxClass = 0;
     } else {
       // Multi-class: find best class
       for (let c = 0; c < numClasses; c++) {
-        const s = outputData[(4 + c) * numDetections + i];
+        const s = outputData[(4 + c) * numDetections + i]!;
         if (s > maxScore) { maxScore = s; maxClass = c; }
       }
     }
@@ -326,29 +328,27 @@ export async function detectPotholes(video: HTMLVideoElement): Promise<Detection
 
   // ── NMS ──
   const kept = nms(rawBoxes, rawScores, IOU_THRESHOLD);
-  console.log(`[YOLO] After NMS: ${kept.length} detections (scores: ${kept.map(i => rawScores[i].toFixed(2)).join(', ')})`);
+  console.log(`[YOLO] After NMS: ${kept.length} detections (scores: ${kept.map(i => rawScores[i]!.toFixed(2)).join(', ')})`);
 
 
   // ── Convert to Detection[] with temporal smoothing ──
-  const results: Detection[] = kept.map((idx, slotIdx) => {
-    const [bx, by, bx2, by2] = rawBoxes[idx];
+  const results: Detection[] = kept.map((idx, slotIdx): Detection => {
+    const box = rawBoxes[idx]!;
+    const [bx, by, bx2, by2] = box;
     const bw = bx2 - bx;
     const bh = by2 - by;
 
     const prev = smoothed.get(slotIdx);
-    let finalBox: [number, number, number, number];
-    if (prev) {
-      finalBox = [
-        lerpVal(prev.bbox[0], bx),
-        lerpVal(prev.bbox[1], by),
-        lerpVal(prev.bbox[2], bw),
-        lerpVal(prev.bbox[3], bh),
-      ];
-    } else {
-      finalBox = [bx, by, bw, bh];
-    }
+    const finalBox: [number, number, number, number] = prev
+      ? [
+          lerpVal(prev.bbox[0], bx),
+          lerpVal(prev.bbox[1], by),
+          lerpVal(prev.bbox[2], bw),
+          lerpVal(prev.bbox[3], bh),
+        ]
+      : [bx, by, bw, bh];
 
-    const det: Detection = { bbox: finalBox, class: 'pothole', score: rawScores[idx] };
+    const det: Detection = { bbox: finalBox, class: 'pothole', score: rawScores[idx]! };
     smoothed.set(slotIdx, det);
     return det;
   });

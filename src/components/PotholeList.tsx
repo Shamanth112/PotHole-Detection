@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Pothole } from '../hooks/usePotholes';
-import { MapPin, Clock, ChevronRight, AlertTriangle, Info, Trash2, Loader2, Filter, Search } from 'lucide-react';
+import { MapPin, Clock, ChevronRight, AlertTriangle, Info, Trash2, Loader2, Filter, Search, Camera } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
@@ -97,21 +97,50 @@ export default function PotholeList({ potholes }: PotholeListProps) {
 
       {/* ── Empty state ── */}
       {filtered.length === 0 && (
-        <div className="glass rounded-3xl p-16 text-center">
-          <div className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)' }}>
-            <MapPin className="w-8 h-8" style={{ color: 'var(--text-muted)' }} />
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="glass rounded-3xl p-12 md:p-16 text-center"
+        >
+          <div className="w-20 h-20 rounded-3xl mx-auto mb-5 flex items-center justify-center" style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)' }}>
+            <MapPin className="w-10 h-10 text-blue-400" aria-hidden="true" />
           </div>
-          <p className="text-lg font-bold">No reports found</p>
-          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Try adjusting your filters or report a new pothole</p>
-        </div>
+          {potholes.length === 0 ? (
+            <>
+              <h3 className="text-xl font-black tracking-tight mb-2">No reports yet</h3>
+              <p className="text-sm max-w-md mx-auto leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                You haven't reported any potholes yet. Be the first to help your community
+                by spotting road damage with the AI scanner.
+              </p>
+              <div className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600/15 border border-blue-500/30 text-blue-300 text-sm font-semibold">
+                <Camera className="w-4 h-4" aria-hidden="true" />
+                Tap the <strong className="mx-1">Scan</strong> button below to start
+              </div>
+            </>
+          ) : (
+            <>
+              <h3 className="text-xl font-black tracking-tight mb-2">No reports match your filters</h3>
+              <p className="text-sm max-w-md mx-auto leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                Try clearing your search or selecting a different severity filter.
+              </p>
+              <button
+                onClick={() => { setSearch(''); setFilter('all'); }}
+                className="mt-5 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-700/40 hover:bg-zinc-700/60 border border-zinc-600/50 text-sm font-semibold transition-colors"
+              >
+                Clear filters
+              </button>
+            </>
+          )}
+        </motion.div>
       )}
 
       {/* ── Cards grid ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
         <AnimatePresence>
           {filtered.map((p, i) => {
-            const sev = severityConfig[p.severity] || severityConfig.low;
-            const st = statusConfig[p.status] || statusConfig.reported;
+            const sev = severityConfig[p.severity] ?? severityConfig.low!;
+            const st = statusConfig[p.status] ?? statusConfig.reported!;
             const progress = statusProgress[p.status] ?? 10;
 
             return (

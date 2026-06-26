@@ -1,6 +1,6 @@
 import React from 'react';
 import { Play, FileText, Activity, CheckCircle2, ShieldAlert, Wifi, LayoutDashboard, ShieldCheck, ChevronRight, MapPin, TrendingUp, Zap, AlertTriangle, Clock } from 'lucide-react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 
 interface HomeViewProps {
@@ -84,12 +84,13 @@ export default function HomeView({ userRole, onStartDetection, onReportManually,
           onClick={onStartDetection}
           className="group relative overflow-hidden rounded-2xl p-5 md:p-6 text-left transition-all hover:scale-[1.02] active:scale-[0.98]"
           style={{ background: 'linear-gradient(135deg, #1d4ed8 0%, #0284c7 100%)', boxShadow: '0 8px 32px rgba(59,130,246,0.3)' }}
+          aria-label="Start AI detection with your camera"
         >
           <div className="absolute inset-0 group-hover:translate-x-full transition-transform duration-700"
             style={{ background: 'linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.08) 50%, transparent 60%)' }} />
           <div className="relative z-10 flex sm:flex-col items-center sm:items-start gap-4 sm:gap-0">
             <div className="w-11 h-11 md:w-12 md:h-12 rounded-xl bg-white/20 flex items-center justify-center sm:mb-4 shrink-0">
-              <Zap className="w-5 h-5 md:w-6 md:h-6 text-white" />
+              <Zap className="w-5 h-5 md:w-6 md:h-6 text-white" aria-hidden="true" />
             </div>
             <div>
               <h3 className="text-base md:text-lg font-black text-white uppercase tracking-tight">Start AI Detection</h3>
@@ -97,7 +98,7 @@ export default function HomeView({ userRole, onStartDetection, onReportManually,
             </div>
           </div>
           <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-            <ChevronRight className="w-5 h-5 text-white/50" />
+            <ChevronRight className="w-5 h-5 text-white/50" aria-hidden="true" />
           </div>
         </motion.button>
 
@@ -108,10 +109,11 @@ export default function HomeView({ userRole, onStartDetection, onReportManually,
           onClick={onReportManually}
           className="group relative overflow-hidden glass-hover rounded-2xl p-5 md:p-6 text-left transition-all hover:scale-[1.02] active:scale-[0.98]"
           style={{ border: '1px solid rgba(255,255,255,0.1)' }}
+          aria-label="Submit a manual pothole report"
         >
           <div className="relative z-10 flex sm:flex-col items-center sm:items-start gap-4 sm:gap-0">
             <div className="w-11 h-11 md:w-12 md:h-12 rounded-xl flex items-center justify-center sm:mb-4 shrink-0" style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)' }}>
-              <FileText className="w-5 h-5 md:w-6 md:h-6" style={{ color: 'var(--text-secondary)' }} />
+              <FileText className="w-5 h-5 md:w-6 md:h-6" style={{ color: 'var(--text-secondary)' }} aria-hidden="true" />
             </div>
             <div>
               <h3 className="text-base md:text-lg font-black uppercase tracking-tight">Manual Report</h3>
@@ -119,10 +121,35 @@ export default function HomeView({ userRole, onStartDetection, onReportManually,
             </div>
           </div>
           <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-            <ChevronRight className="w-5 h-5" style={{ color: 'var(--text-muted)' }} />
+            <ChevronRight className="w-5 h-5" style={{ color: 'var(--text-muted)' }} aria-hidden="true" />
           </div>
         </motion.button>
       </div>
+
+      {/* ── First-time nudge ── */}
+      <AnimatePresence>
+        {totalReports === 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ delay: 0.45, duration: 0.4 }}
+            className="glass rounded-2xl p-4 md:p-5 flex items-center gap-4"
+            style={{ border: '1px solid rgba(59,130,246,0.2)' }}
+            role="status"
+          >
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0" style={{ background: 'rgba(59,130,246,0.12)' }}>
+              <MapPin className="w-6 h-6 text-blue-400" aria-hidden="true" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-sm">Your map is empty 👋</p>
+              <p className="text-xs mt-0.5 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                Spot a pothole on your commute? Use the AI scanner or submit a manual report — your community's road health starts with you.
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Admin / Municipal Panel ── */}
       {(userRole === 'municipal' || userRole === 'admin') && (

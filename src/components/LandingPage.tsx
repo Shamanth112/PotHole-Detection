@@ -171,7 +171,7 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
     setTimeout(() => setAutoPlay(true), 12000);
   };
 
-  const step = STEPS[activeStep];
+  const step = STEPS[activeStep] ?? STEPS[0]!;
 
   return (
     <div
