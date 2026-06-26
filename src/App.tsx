@@ -14,6 +14,7 @@ import OnboardingTour from './components/OnboardingTour';
 import LandingPage from './components/LandingPage';
 import { usePotholes } from './hooks/usePotholes';
 import { uploadToConvex } from './services/storageService';
+import { flush as flushOfflineQueue, listQueued } from './services/offlineQueue';
 import {
   LayoutDashboard, Map as MapIcon, Camera as CameraIcon, LogOut, ShieldAlert,
   Activity, Settings, ShieldCheck, ArrowLeft, User as UserIcon,
@@ -46,6 +47,78 @@ export default function App() {
 
   const [locationPermission, setLocationPermission] = useState<'prompt' | 'granted' | 'denied'>('prompt');
   const [cameraPermission, setCameraPermission] = useState<'prompt' | 'granted' | 'denied'>('prompt');
+  const [isOnline, setIsOnline] = useState(
+    typeof navigator !== 'undefined' ? navigator.onLine : true
+  );
+  const [queuedCount, setQueuedCount] = useState(0);
+  const [queuedToast, setQueuedToast] = useState<string | null>(null);
+
+  // ── Offline handling ─────────────────────────────────────────────────────
+  // Track online/offline status and try to flush queued reports when we come
+  // back online.
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      // Best-effort flush — uploads any reports that were saved while offline
+      void flushOfflineQueue(async (queued) => {
+        let reportImageId: Id<"_storage"> | undefined;
+        let reportImageUrl: string | undefined;
+        if (queued.photoBlob) {
+          const file = new File([queued.photoBlob], queued.photoFileName ?? 'offline.jpg', {
+            type: queued.photoBlob.type || 'image/jpeg',
+          });
+          const uploadedId = await uploadToConvex(convex, file);
+          reportImageId = uploadedId as Id<"_storage">;
+          reportImageUrl = (await convex.query(api.storage.getImageUrl, {
+            storageId: reportImageId,
+          })) ?? undefined;
+        }
+        await reportPotholeBase({
+          latitude: queued.latitude,
+          longitude: queued.longitude,
+          severity: queued.severity,
+          address: queued.address,
+          reportImageId,
+          reportImageUrl,
+          userName: queued.userName ?? user?.name ?? 'Road Guardian',
+        });
+      }).then(async (n) => {
+        if (n > 0) {
+          setQueuedToast(`${n} queued report${n === 1 ? '' : 's'} uploaded`);
+          window.setTimeout(() => setQueuedToast(null), 4000);
+        }
+        // Refresh the queued-count badge
+        try {
+          const remaining = await listQueued();
+          setQueuedCount(remaining.length);
+        } catch {
+          /* ignore */
+        }
+      }).catch(err => console.warn('[offline] flush failed:', err));
+    };
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    // Initial flush attempt on mount (in case reports were queued in a previous session)
+    if (navigator.onLine) {
+      void handleOnline();
+    }
+    // Poll the queue length for the sidebar badge
+    const refreshCount = () => {
+      listQueued()
+        .then(q => setQueuedCount(q.length))
+        .catch(() => {/* ignore */});
+    };
+    refreshCount();
+    const poll = window.setInterval(refreshCount, 5000);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      window.clearInterval(poll);
+    };
+    // We intentionally omit dependencies — this should only run once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     // 1. Geolocation Permission Query
@@ -144,7 +217,7 @@ export default function App() {
     } catch (error) { console.error("Error uploading profile photo:", error); }
   };
 
-  const handleReportPothole = async (data: { latitude: number; longitude: number; severity: string; address?: string; reportImageUrl?: string; reportImageId?: string }, isAuto = false) => {
+  const handleReportPothole = async (data: { latitude: number; longitude: number; severity: string; address?: string; reportImageUrl?: string; reportImageId?: string; photoBlob?: Blob; photoFileName?: string }, isAuto = false) => {
     if (!user) return;
     try {
       const potholeId = await reportPotholeBase({
@@ -159,6 +232,39 @@ export default function App() {
       return potholeId;
     } catch (error: any) {
       console.error("Error reporting pothole:", error);
+
+      // If we look offline, persist the report to IndexedDB so the user
+      // doesn't lose their work. Re-upload happens automatically when
+      // `online` fires (see useEffect above).
+      const looksOffline =
+        !navigator.onLine ||
+        error?.message?.toLowerCase().includes('network') ||
+        error?.message?.toLowerCase().includes('failed to fetch') ||
+        error?.message?.toLowerCase().includes('offline');
+
+      if (looksOffline) {
+        try {
+          const { enqueue } = await import('./services/offlineQueue');
+          await enqueue({
+            latitude: data.latitude,
+            longitude: data.longitude,
+            severity: data.severity as 'low' | 'medium' | 'high',
+            address: data.address,
+            userName: user.name ?? 'Road Guardian',
+            photoBlob: data.photoBlob,
+            photoFileName: data.photoFileName,
+          });
+          const refreshed = await listQueued();
+          setQueuedCount(refreshed.length);
+          setQueuedToast("Saved offline — we'll upload when you're back online");
+          window.setTimeout(() => setQueuedToast(null), 4000);
+          if (!isAuto) confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 }, colors: ['#fbbf24', '#f59e0b'] });
+          return undefined;
+        } catch (queueErr) {
+          console.error('[offline] enqueue failed:', queueErr);
+        }
+      }
+
       if (!isAuto) alert("Failed to submit report: " + (error?.message || JSON.stringify(error)));
       throw error;
     }
@@ -372,16 +478,64 @@ export default function App() {
                 </button>
               </div>
 
-              {/* GPS status pill */}
-              <div className="flex items-center gap-2 glass rounded-xl px-3 py-2 mb-4">
-                <div className="pulse-dot w-2 h-2 rounded-full bg-emerald-400" style={{ '--tw-bg-opacity': 1 } as any}>
-                  <div className="absolute inset-[-3px] rounded-full bg-emerald-400 opacity-40 animate-ping" />
+              {/* GPS + connection status pills */}
+              <div className="flex flex-col gap-2 mb-4">
+                <div className="flex items-center gap-2 glass rounded-xl px-3 py-2">
+                  <div className="pulse-dot w-2 h-2 rounded-full bg-emerald-400" style={{ '--tw-bg-opacity': 1 } as any}>
+                    <div className="absolute inset-[-3px] rounded-full bg-emerald-400 opacity-40 animate-ping" />
+                  </div>
+                  <span className="text-xs font-semibold text-emerald-400">GPS Active</span>
+                  <span className="ml-auto text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                    {userLocation ? `${userLocation.lat.toFixed(2)}°` : 'Locating...'}
+                  </span>
                 </div>
-                <span className="text-xs font-semibold text-emerald-400">GPS Active</span>
-                <span className="ml-auto text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                  {userLocation ? `${userLocation.lat.toFixed(2)}°` : 'Locating...'}
-                </span>
+                <div
+                  className="flex items-center gap-2 glass rounded-xl px-3 py-2"
+                  title={isOnline ? 'Connected — changes sync in real-time' : 'Offline — reports will be saved locally and uploaded when you reconnect'}
+                >
+                  <div
+                    className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}`}
+                    aria-hidden="true"
+                  />
+                  <span
+                    className="text-xs font-semibold"
+                    style={{ color: isOnline ? '#34d399' : '#fbbf24' }}
+                  >
+                    {isOnline ? 'Online' : 'Offline'}
+                  </span>
+                  {queuedCount > 0 && (
+                    <span
+                      className="ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-md"
+                      style={{ background: 'rgba(251, 191, 36, 0.15)', color: '#fbbf24' }}
+                      aria-label={`${queuedCount} report${queuedCount === 1 ? '' : 's'} queued for upload`}
+                    >
+                      {queuedCount} queued
+                    </span>
+                  )}
+                </div>
               </div>
+
+              {/* Offline-saved toast */}
+              <AnimatePresence>
+                {queuedToast && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    role="status"
+                    aria-live="polite"
+                    className="mb-4 px-3 py-2 rounded-xl text-[11px] font-semibold flex items-center gap-2"
+                    style={{
+                      background: 'rgba(251, 191, 36, 0.1)',
+                      border: '1px solid rgba(251, 191, 36, 0.3)',
+                      color: '#fcd34d',
+                    }}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" aria-hidden="true" />
+                    {queuedToast}
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* Theme toggle in sidebar */}
               <div className="flex items-center justify-between glass rounded-xl px-3 py-2 mb-4">
